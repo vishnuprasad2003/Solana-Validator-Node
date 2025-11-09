@@ -76,9 +76,30 @@ echo ""
 echo "Current configuration:"
 solana config get
 
-# Step 5: Create validator start script
+# Step 5: Download Metaplex Token Metadata Program
 echo ""
-echo -e "${YELLOW}[5/5] Creating validator management scripts...${NC}"
+echo -e "${YELLOW}[5/6] Downloading Metaplex Token Metadata Program...${NC}"
+PROGRAMS_DIR="$HOME/.local/share/solana-programs"
+METADATA_PROGRAM_ID="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+METADATA_PROGRAM_FILE="$PROGRAMS_DIR/mpl-token-metadata.so"
+
+mkdir -p "$PROGRAMS_DIR"
+
+if [ -f "$METADATA_PROGRAM_FILE" ]; then
+    echo -e "${GREEN}✓ Token Metadata program already exists${NC}"
+else
+    echo -e "${YELLOW}Downloading Token Metadata program from mainnet...${NC}"
+    if solana program dump -u m "$METADATA_PROGRAM_ID" "$METADATA_PROGRAM_FILE" 2>/dev/null; then
+        echo -e "${GREEN}✓ Token Metadata program downloaded${NC}"
+    else
+        echo -e "${YELLOW}⚠ Could not download program (may need internet). You can download it later with:${NC}"
+        echo "  ./download-metaplex-program.sh"
+    fi
+fi
+
+# Step 6: Create validator start script
+echo ""
+echo -e "${YELLOW}[6/6] Creating validator management scripts...${NC}"
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -86,12 +107,15 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # Create start script
 cat > "$SCRIPT_DIR/start-validator.sh" << 'EOFSCRIPT'
 #!/bin/bash
-# Start Solana Test Validator
+# Start Solana Test Validator with Metaplex Token Metadata Program
 
 LEDGER_DIR="$HOME/solana-local-ledger"
 RPC_PORT=8899
 RPC_BIND_ADDRESS="0.0.0.0"
 FAUCET_PORT=9900
+PROGRAMS_DIR="$HOME/.local/share/solana-programs"
+METADATA_PROGRAM_ID="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+METADATA_PROGRAM_FILE="$PROGRAMS_DIR/mpl-token-metadata.so"
 
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
@@ -100,14 +124,29 @@ echo "  RPC: http://$RPC_BIND_ADDRESS:$RPC_PORT"
 echo "  Ledger: $LEDGER_DIR"
 echo ""
 
-solana-test-validator \
-    --ledger "$LEDGER_DIR" \
+# Build validator command
+VALIDATOR_CMD="solana-test-validator \
+    --ledger \"$LEDGER_DIR\" \
     --reset \
-    --rpc-port "$RPC_PORT" \
-    --bind-address "$RPC_BIND_ADDRESS" \
-    --faucet-port "$FAUCET_PORT" \
+    --rpc-port $RPC_PORT \
+    --bind-address $RPC_BIND_ADDRESS \
+    --faucet-port $FAUCET_PORT \
     --quiet \
-    --limit-ledger-size
+    --limit-ledger-size"
+
+# Add Metaplex Token Metadata program if it exists
+if [ -f "$METADATA_PROGRAM_FILE" ]; then
+    echo "  Including: Metaplex Token Metadata Program"
+    VALIDATOR_CMD="$VALIDATOR_CMD --bpf-program $METADATA_PROGRAM_ID $METADATA_PROGRAM_FILE"
+else
+    echo "  ⚠ Metaplex Token Metadata program not found at: $METADATA_PROGRAM_FILE"
+    echo "     Run ./download-metaplex-program.sh to download it"
+fi
+
+echo ""
+
+# Execute validator command
+eval $VALIDATOR_CMD
 EOFSCRIPT
 
 chmod +x "$SCRIPT_DIR/start-validator.sh"
@@ -187,6 +226,46 @@ EOFSCRIPT
 
 chmod +x "$SCRIPT_DIR/start-validator-tmux.sh"
 echo -e "${GREEN}✓ Created start-validator-tmux.sh${NC}"
+
+# Create download script for Metaplex program
+cat > "$SCRIPT_DIR/download-metaplex-program.sh" << 'EOFDOWNLOAD'
+#!/bin/bash
+# Download Metaplex Token Metadata Program
+
+set -e
+
+PROGRAMS_DIR="$HOME/.local/share/solana-programs"
+METADATA_PROGRAM_ID="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+METADATA_PROGRAM_FILE="$PROGRAMS_DIR/mpl-token-metadata.so"
+
+export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+
+mkdir -p "$PROGRAMS_DIR"
+
+if [ -f "$METADATA_PROGRAM_FILE" ]; then
+    echo "Token Metadata program already exists. Removing old version..."
+    rm -f "$METADATA_PROGRAM_FILE"
+fi
+
+echo "Downloading Token Metadata program from mainnet..."
+echo "  Program ID: $METADATA_PROGRAM_ID"
+echo "  Output: $METADATA_PROGRAM_FILE"
+
+if solana program dump -u m "$METADATA_PROGRAM_ID" "$METADATA_PROGRAM_FILE"; then
+    echo "✓ Token Metadata program downloaded successfully"
+    echo "  File: $METADATA_PROGRAM_FILE"
+    echo "  Size: $(du -h "$METADATA_PROGRAM_FILE" | cut -f1)"
+    echo ""
+    echo "The program will be automatically loaded when you restart the validator."
+else
+    echo "✗ Failed to download Token Metadata program"
+    echo "  Make sure you have internet connection and Solana CLI is installed"
+    exit 1
+fi
+EOFDOWNLOAD
+
+chmod +x "$SCRIPT_DIR/download-metaplex-program.sh"
+echo -e "${GREEN}✓ Created download-metaplex-program.sh${NC}"
 
 echo ""
 echo -e "${GREEN}=========================================="

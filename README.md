@@ -99,7 +99,8 @@ Initializes the validator:
 - `~/solana-local-ledger/` - Blockchain data storage
 - `~/.config/solana/validator-keypair.json` - Validator identity
 - `~/.config/solana/id.json` - Default keypair for transactions
-- Management scripts (start, stop, reset)
+- `~/.local/share/solana-programs/mpl-token-metadata.so` - Metaplex Token Metadata program (downloaded from mainnet)
+- Management scripts (start, stop, reset, download-metaplex-program)
 
 **Keypair addresses:**
 ```bash
@@ -158,6 +159,23 @@ sudo systemctl stop solana-validator
 
 Press `Ctrl+C` to stop.
 
+### Metaplex Token Metadata Program
+
+The validator automatically includes the **Metaplex Token Metadata Program** which enables:
+- ✅ Creating on-chain metadata accounts for tokens
+- ✅ Token name and symbol display in Solana Explorer
+- ✅ Full compatibility with Metaplex standards
+
+**Program Details:**
+- **Program ID**: `metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s`
+- **Location**: `~/.local/share/solana-programs/mpl-token-metadata.so`
+- **Download**: Automatically during `setup-validator.sh`, or manually:
+  ```bash
+  ./download-metaplex-program.sh
+  ```
+
+**Note**: The program is downloaded from mainnet during setup. If download fails, you can run the download script manually later.
+
 ### Validator Configuration
 
 The validator runs with these settings:
@@ -167,6 +185,7 @@ The validator runs with these settings:
 - **Bind Address**: 0.0.0.0 (allows remote connections)
 - **Ledger**: `~/solana-local-ledger`
 - **Reset on Start**: Yes (use `--no-reset` in script to persist)
+- **Included Programs**: Metaplex Token Metadata Program (if downloaded)
 
 **RPC Endpoints:**
 - Local: `http://127.0.0.1:8899`
@@ -636,6 +655,7 @@ Solana-Validator-Node/
 ├── start-cluster-validator.sh  # Start as cluster node (created by cluster setup)
 ├── stop-validator.sh           # Stop validator (created by setup)
 ├── reset-validator.sh          # Reset ledger (created by setup)
+├── download-metaplex-program.sh # Download Metaplex Token Metadata program
 ├── verify-setup.sh             # Verification script
 ├── security-setup.sh           # Security & access control
 ├── maintenance.sh              # Maintenance & monitoring menu
@@ -664,6 +684,7 @@ Solana-Validator-Node/
 | `start-cluster-validator.sh` | Start cluster node | Cluster mode |
 | `stop-validator.sh` | Stop validator process | Maintenance |
 | `reset-validator.sh` | Clear all ledger data | Fresh start |
+| `download-metaplex-program.sh` | Download Metaplex Token Metadata program | Setup metadata support |
 | `verify-setup.sh` | Verify installation & status | Health check |
 | `security-setup.sh` | Configure firewall & access | Security setup |
 | `maintenance.sh` | Interactive maintenance menu | Daily operations |
