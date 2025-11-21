@@ -20,12 +20,20 @@ echo ""
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 
+# Load configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/config.env" ]; then
+    source "$SCRIPT_DIR/config.env"
+else
+    # Defaults if config.env doesn't exist
+    RPC_PORT=8899
+    FAUCET_PORT=9900
+    RPC_BIND_ADDRESS="0.0.0.0"
+    LEDGER_DIR="$HOME/solana-local-ledger"
+fi
+
 # Configuration variables
-LEDGER_DIR="$HOME/solana-local-ledger"
 KEYPAIR_DIR="$HOME/.config/solana"
-RPC_PORT=8899
-RPC_BIND_ADDRESS="0.0.0.0"  # Allow remote connections
-FAUCET_PORT=9900
 
 # Step 1: Create directories
 echo -e "${YELLOW}[1/5] Creating directories...${NC}"

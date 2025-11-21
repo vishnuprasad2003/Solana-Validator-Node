@@ -12,6 +12,8 @@ This repository provides everything needed to set up a private Solana validator 
 - ✅ Persistent ledger storage
 - ✅ RPC endpoint (local and remote access)
 - ✅ **Multi-node cluster support** - Connect multiple validators
+- ✅ **Centralized configuration** - Easy version management via `config.env`
+- ✅ **Upgrade support** - Simple upgrade script for future Solana versions
 - ✅ **Security & access control** - IP whitelist, firewall rules
 - ✅ **Maintenance tools** - Monitoring, health checks, backups
 - ✅ Background process management (tmux/systemd)
@@ -216,6 +218,24 @@ sudo systemctl stop solana-validator   # Systemd
 ```
 
 ⚠️ **Warning**: This deletes all ledger data and starts fresh.
+
+### Upgrade Solana CLI
+
+To upgrade to a new version of Solana CLI:
+
+```bash
+./upgrade-solana.sh
+```
+
+This script will:
+- Stop the running validator
+- Backup the current installation
+- Update `config.env` with the new version
+- Install the new Solana version
+- Update `VERSION_COMPATIBILITY.md` with version information
+- Preserve all ledger data and configuration
+
+**Note**: Update the `SOLANA_VERSION` in `config.env` to upgrade to a specific version, or use the interactive upgrade script.
 
 ### View Logs
 
@@ -646,7 +666,9 @@ solana balance
 
 ```
 Solana-Validator-Node/
+├── config.env                  # Centralized configuration (versions, ports, etc.)
 ├── install.sh                  # Installation script
+├── upgrade-solana.sh           # Upgrade Solana CLI version
 ├── setup-validator.sh          # Single node setup (default)
 ├── setup-cluster.sh            # Multi-node cluster setup
 ├── add-validator.sh            # Add node to cluster
@@ -662,11 +684,12 @@ Solana-Validator-Node/
 ├── monitor.sh                  # Continuous monitoring
 ├── firewall-setup.sh           # Firewall configuration
 ├── cluster-info.sh             # Cluster information (created by cluster setup)
-├── systemd/                     # Systemd service files
-│   ├── install-service.sh
-│   └── solana-validator.service
-├── .gitignore                  # Git ignore rules
-└── README.md                   # This file
+├── systemd/                      # Systemd service files
+│   ├── install-service.sh        # Install systemd service
+│   └── solana-validator.service  # Service definition
+├── README.md                      # Main documentation
+├── VERSION_COMPATIBILITY.md      # Solana/Anchor/Program version compatibility
+└── PRODUCTION.md                  # Production deployment guide
 ```
 
 **Note**: Test directories (`examples/`, `my_program/`) are excluded via `.gitignore` and should not be committed. These are only for local testing. Use Solana Playground for program deployment.
@@ -944,11 +967,29 @@ sudo ./security-setup.sh
 - Security audit
 - Update Solana CLI if needed
 
+## 📚 Documentation
+
+This repository includes comprehensive documentation:
+
+| Document | Purpose | When to Use |
+|----------|---------|-------------|
+| [`README.md`](./README.md) | Main documentation - setup, configuration, management, multi-node setup | Start here for installation and basic usage |
+| [`VERSION_COMPATIBILITY.md`](./VERSION_COMPATIBILITY.md) | Solana CLI, Anchor, and program version compatibility | Before deploying programs, check version compatibility |
+| [`PRODUCTION.md`](./PRODUCTION.md) | Production deployment guide - security, monitoring, backups, scaling | When deploying to production environment |
+
+### Quick Reference
+
+- **First time setup?** → Start with [`README.md`](./README.md) Quick Start section
+- **Deploying programs?** → Check [`VERSION_COMPATIBILITY.md`](./VERSION_COMPATIBILITY.md) for version compatibility
+- **Production deployment?** → See [`PRODUCTION.md`](./PRODUCTION.md)
+
 ## 📚 Additional Resources
 
 - [Solana Documentation](https://docs.solana.com/)
 - [Solana CLI Reference](https://docs.solana.com/cli)
 - [Test Validator Guide](https://docs.solana.com/developing/test-validator)
+- [Anchor Framework](https://www.anchor-lang.com/)
+- [Metaplex Documentation](https://docs.metaplex.com/)
 
 ## 📄 License
 

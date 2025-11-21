@@ -38,19 +38,40 @@ fi
 # Ensure cargo is in PATH
 export PATH="$HOME/.cargo/bin:$PATH"
 
+# Load configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/config.env" ]; then
+    source "$SCRIPT_DIR/config.env"
+else
+    # Defaults if config.env doesn't exist
+    SOLANA_VERSION="stable"
+fi
+
 # Step 2: Install Solana CLI
 echo ""
-echo -e "${YELLOW}[2/4] Installing Solana CLI (latest stable version)...${NC}"
+echo -e "${YELLOW}[2/4] Installing Solana CLI ($SOLANA_VERSION version)...${NC}"
 
 # Check if Solana is already installed
 if command -v solana &> /dev/null; then
     echo -e "${GREEN}✓ Solana CLI is already installed${NC}"
     solana --version
-    echo -e "${YELLOW}Updating to latest version...${NC}"
-    sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+    echo -e "${YELLOW}Updating to $SOLANA_VERSION version...${NC}"
+    if [ "$SOLANA_VERSION" = "stable" ]; then
+        sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+    elif [ "$SOLANA_VERSION" = "beta" ]; then
+        sh -c "$(curl -sSfL https://release.solana.com/beta/install)"
+    else
+        sh -c "$(curl -sSfL https://release.solana.com/$SOLANA_VERSION/install)"
+    fi
 else
-    echo -e "${YELLOW}Installing Solana CLI...${NC}"
-    sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+    echo -e "${YELLOW}Installing Solana CLI ($SOLANA_VERSION)...${NC}"
+    if [ "$SOLANA_VERSION" = "stable" ]; then
+        sh -c "$(curl -sSfL https://release.solana.com/stable/install)"
+    elif [ "$SOLANA_VERSION" = "beta" ]; then
+        sh -c "$(curl -sSfL https://release.solana.com/beta/install)"
+    else
+        sh -c "$(curl -sSfL https://release.solana.com/$SOLANA_VERSION/install)"
+    fi
 fi
 
 # Add Solana to PATH

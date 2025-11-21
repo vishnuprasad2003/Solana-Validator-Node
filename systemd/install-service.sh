@@ -30,9 +30,20 @@ fi
 
 SERVICE_USER="$SUDO_USER"
 SERVICE_USER_HOME=$(eval echo ~$SERVICE_USER)
+
+# Get the repository directory (parent of systemd directory)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_DIR="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+if [ ! -f "$REPO_DIR/start-validator.sh" ]; then
+    echo -e "${RED}Error: start-validator.sh not found in $REPO_DIR${NC}"
+    exit 1
+fi
+
 SERVICE_FILE="/etc/systemd/system/solana-validator.service"
 
 echo -e "${YELLOW}Installing systemd service...${NC}"
+echo "Repository Directory: $REPO_DIR"
 
 # Create service file
 cat > "$SERVICE_FILE" << EOF
@@ -45,7 +56,7 @@ Type=simple
 User=$SERVICE_USER
 WorkingDirectory=$SERVICE_USER_HOME
 Environment="PATH=$SERVICE_USER_HOME/.local/share/solana/install/active_release/bin:$SERVICE_USER_HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
-ExecStart=$SERVICE_USER_HOME/start-validator.sh
+ExecStart=$REPO_DIR/start-validator.sh
 Restart=always
 RestartSec=10
 StandardOutput=journal
@@ -72,7 +83,6 @@ echo "  Status:  sudo systemctl status solana-validator"
 echo "  Enable:  sudo systemctl enable solana-validator  (start on boot)"
 echo "  Logs:    sudo journalctl -u solana-validator -f"
 echo ""
-echo "Note: Make sure start-validator.sh is executable:"
-echo "  chmod +x $SERVICE_USER_HOME/start-validator.sh"
+echo "Note: The service uses the start script from: $REPO_DIR"
 echo ""
 
