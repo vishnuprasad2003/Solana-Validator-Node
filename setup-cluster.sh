@@ -107,7 +107,7 @@ LEDGER_DIR="$HOME/solana-local-ledger"
 CLUSTER_DIR="$HOME/solana-cluster-config"
 BOOTSTRAP_KEYPAIR="$CLUSTER_DIR/bootstrap-validator-keypair.json"
 RPC_PORT=8899
-RPC_BIND_ADDRESS="0.0.0.0"
+RPC_BIND_ADDRESS="127.0.0.1"
 FAUCET_PORT=9900
 GOSSIP_PORT=8001
 
@@ -148,7 +148,7 @@ fi
 echo ""
 
 # Build command
-CMD="solana-test-validator --ledger \"$LEDGER_DIR\" --rpc-port $RPC_PORT --rpc-bind-address $RPC_BIND_ADDRESS --faucet-port $FAUCET_PORT --gossip-port $GOSSIP_PORT --identity \"$VALIDATOR_KEYPAIR\" --quiet --limit-ledger-size"
+CMD="solana-test-validator --ledger \"$LEDGER_DIR\" --rpc-port $RPC_PORT --bind-address $RPC_BIND_ADDRESS --faucet-port $FAUCET_PORT --gossip-port $GOSSIP_PORT --identity \"$VALIDATOR_KEYPAIR\" --quiet --limit-ledger-size"
 
 if [ -n "$RESET_FLAG" ]; then
     CMD="$CMD $RESET_FLAG"

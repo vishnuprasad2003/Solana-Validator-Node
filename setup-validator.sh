@@ -28,7 +28,7 @@ else
     # Defaults if config.env doesn't exist
     RPC_PORT=8899
     FAUCET_PORT=9900
-    RPC_BIND_ADDRESS="0.0.0.0"
+    RPC_BIND_ADDRESS="127.0.0.1"
     LEDGER_DIR="$HOME/solana-local-ledger"
 fi
 
@@ -119,7 +119,7 @@ cat > "$SCRIPT_DIR/start-validator.sh" << 'EOFSCRIPT'
 
 LEDGER_DIR="$HOME/solana-local-ledger"
 RPC_PORT=8899
-RPC_BIND_ADDRESS="0.0.0.0"
+RPC_BIND_ADDRESS="127.0.0.1"
 FAUCET_PORT=9900
 PROGRAMS_DIR="$HOME/.local/share/solana-programs"
 METADATA_PROGRAM_ID="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"

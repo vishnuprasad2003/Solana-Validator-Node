@@ -2,7 +2,7 @@
 
 This document specifies the Solana CLI version, Anchor framework version, and program compatibility for each Solana version. Update this document when upgrading Solana.
 
-## Current Version: 1.18.26
+## Current Version: 3.0.13
 
 ### Solana CLI Version
 
@@ -61,7 +61,9 @@ This document specifies the Solana CLI version, Anchor framework version, and pr
 
 | Solana Version | Anchor Version | Token Program | Metaplex | Notes |
 |----------------|----------------|---------------|----------|-------|
-| 1.18.26 | 0.32.1 (AVM) | Token + Token-2022 | Compatible | Current version |
+| 3.0.13 | latest (AVM) | Token + Token-2022 | Compatible | Current version |
+| 3.0.13 | latest (AVM) | Token + Token-2022 | Compatible | Current version |
+| 1.18.26 | latest (AVM) | Token + Token-2022 | Compatible | Previous version |
 | 1.17.x | latest (AVM) | Token + Token-2022 | Compatible | Previous stable |
 | 1.16.x | latest (AVM) | Token + Token-2022 | Compatible | Previous stable |
 
