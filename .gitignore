@@ -1,56 +1,30 @@
 # Solana Validator Node - Git Ignore
 
-# Ledger data (user-specific, not in repo)
+# Ledger data
 solana-local-ledger/
-~/solana-local-ledger/
-
-# Keypairs (DO NOT COMMIT - security risk)
-*.json
-!package.json
-!tsconfig.json
-id.json
-validator-keypair.json
-*-keypair.json
-
-# Rust build artifacts
-target/
-**/target/
-Cargo.lock
-
-# Node.js
-node_modules/
-npm-debug.log
-yarn-error.log
-package-lock.json
-yarn.lock
-
-# Environment files
-.env
-.env.local
-.env.*.local
-
-# Logs
 *.log
-logs/
+
+# Generated scripts
+start-validator.sh
+stop-validator.sh
+reset-validator.sh
+
+# Backup files
+*.backup
+*.bak
+*.old
 
 # OS files
 .DS_Store
 Thumbs.db
+
+# Editor files
 *.swp
 *.swo
 *~
-
-# IDE
 .vscode/
 .idea/
-*.iml
 
-# Snapshots and backups
-*.tar.gz
-snapshots/
-backups/
-
-# User test projects (not part of repo)
+# Test files
 examples/
 my_program/
-test-programs/

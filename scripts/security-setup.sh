@@ -108,7 +108,7 @@ ALLOWED_IPS="$HOME/solana-cluster-config/allowed-ips.txt"
 if ! grep -q "^$IP$" "$ALLOWED_IPS" 2>/dev/null; then
     echo "$IP" >> "$ALLOWED_IPS"
     echo "Added $IP to whitelist"
-    echo "Run: sudo ./security-setup.sh to apply changes"
+    echo "Run: sudo scripts/security-setup.sh to apply changes"
 else
     echo "$IP is already in whitelist"
 fi
@@ -141,6 +141,6 @@ ufw status
 echo ""
 echo "To add allowed IPs:"
 echo "  solana-allow-ip <ip-address>"
-echo "  sudo ./security-setup.sh"
+echo "  sudo scripts/security-setup.sh"
 echo ""
 

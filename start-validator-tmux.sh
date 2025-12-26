@@ -17,7 +17,8 @@ if tmux has-session -t "$SESSION_NAME" 2>/dev/null; then
     tmux attach-session -t "$SESSION_NAME"
 else
     echo "Starting validator in tmux session: $SESSION_NAME"
-    tmux new-session -d -s "$SESSION_NAME" -c "$HOME" "$SCRIPT_DIR/start-validator.sh"
+    # Use the script directory as working directory so config.env can be found
+    tmux new-session -d -s "$SESSION_NAME" -c "$SCRIPT_DIR" "$SCRIPT_DIR/start-validator.sh"
     echo "Validator started in tmux session: $SESSION_NAME"
     echo "To attach: tmux attach -t $SESSION_NAME"
     echo "To detach: Press Ctrl+B, then D"

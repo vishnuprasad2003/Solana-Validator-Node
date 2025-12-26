@@ -101,7 +101,7 @@ else
         echo -e "${GREEN}✓ Token Metadata program downloaded${NC}"
     else
         echo -e "${YELLOW}⚠ Could not download program (may need internet). You can download it later with:${NC}"
-        echo "  ./download-metaplex-program.sh"
+        echo "  scripts/download-metaplex-program.sh"
     fi
 fi
 
@@ -113,17 +113,24 @@ echo -e "${YELLOW}[6/6] Creating validator management scripts...${NC}"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 
 # Create start script
-cat > "$SCRIPT_DIR/start-validator.sh" << 'EOFSCRIPT'
+cat > "$SCRIPT_DIR/start-validator.sh" << EOFSCRIPT
 #!/bin/bash
 # Start Solana Test Validator with Metaplex Token Metadata Program
 
-LEDGER_DIR="$HOME/solana-local-ledger"
-RPC_PORT=8899
-RPC_BIND_ADDRESS="127.0.0.1"
-FAUCET_PORT=9900
-PROGRAMS_DIR="$HOME/.local/share/solana-programs"
-METADATA_PROGRAM_ID="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-METADATA_PROGRAM_FILE="$PROGRAMS_DIR/mpl-token-metadata.so"
+# Load configuration from config.env if available
+SCRIPT_DIR="\$(cd "\$(dirname "\${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "\$SCRIPT_DIR/config.env" ]; then
+    source "\$SCRIPT_DIR/config.env"
+fi
+
+# Set defaults if not in config.env
+LEDGER_DIR="\${LEDGER_DIR:-\$HOME/solana-local-ledger}"
+RPC_PORT="\${RPC_PORT:-8899}"
+RPC_BIND_ADDRESS="\${RPC_BIND_ADDRESS:-127.0.0.1}"
+FAUCET_PORT="\${FAUCET_PORT:-9900}"
+PROGRAMS_DIR="\${PROGRAMS_DIR:-\$HOME/.local/share/solana-programs}"
+METADATA_PROGRAM_ID="\${METADATA_PROGRAM_ID:-metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s}"
+METADATA_PROGRAM_FILE="\${METADATA_PROGRAM_FILE:-\$PROGRAMS_DIR/mpl-token-metadata.so}"
 
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
@@ -148,7 +155,7 @@ if [ -f "$METADATA_PROGRAM_FILE" ]; then
     VALIDATOR_CMD="$VALIDATOR_CMD --bpf-program $METADATA_PROGRAM_ID $METADATA_PROGRAM_FILE"
 else
     echo "  ⚠ Metaplex Token Metadata program not found at: $METADATA_PROGRAM_FILE"
-    echo "     Run ./download-metaplex-program.sh to download it"
+    echo "     Run scripts/download-metaplex-program.sh to download it"
 fi
 
 echo ""
