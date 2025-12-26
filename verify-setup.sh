@@ -3,22 +3,34 @@
 # Verification Script for Solana Validator
 # This script verifies that the validator is running and functional
 
-set -e
+set -euo pipefail
 
 # Colors for output
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
-NC='\033[0m' # No Color
+BLUE='\033[0;34m'
+NC='\033[0m'
+
+# Load configuration
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+if [ -f "$SCRIPT_DIR/config.env" ]; then
+    source "$SCRIPT_DIR/config.env"
+fi
 
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 
-RPC_URL="http://127.0.0.1:8899"
+# Use dynamic RPC URL from config
+RPC_BIND_ADDRESS="${RPC_BIND_ADDRESS:-127.0.0.1}"
+RPC_PORT="${RPC_PORT:-8899}"
+RPC_URL="http://$RPC_BIND_ADDRESS:$RPC_PORT"
 
-echo "=========================================="
+echo -e "${BLUE}=========================================="
 echo "Solana Validator Verification"
-echo "=========================================="
+echo "==========================================${NC}"
+echo ""
+echo -e "${BLUE}RPC Endpoint:${NC} $RPC_URL"
 echo ""
 
 # Test 1: Check if validator is running
@@ -103,16 +115,16 @@ echo -e "${GREEN}=========================================="
 echo "Verification Complete!"
 echo "==========================================${NC}"
 echo ""
-echo "Validator Status:"
-echo "  RPC URL: $RPC_URL"
-echo "  Status: Running"
+echo -e "${GREEN}Validator Status:${NC}"
+echo "  RPC URL:         $RPC_URL"
+echo "  Status:          Running"
 echo "  Cluster Version: $VERSION"
-echo "  Account: $ACCOUNT"
-echo "  Balance: $BALANCE SOL"
+echo "  Account:         $ACCOUNT"
+echo "  Balance:         $BALANCE SOL"
 echo ""
-echo "Next steps:"
-echo "1. Deploy a test program: ./deploy-example-program.sh"
-echo "2. Mint test tokens: ./mint-test-tokens.sh"
-echo "3. Test Node.js integration: node examples/test-rpc.js"
+echo -e "${BLUE}Test RPC:${NC}"
+echo "  curl -X POST $RPC_URL \\"
+echo "    -H 'Content-Type: application/json' \\"
+echo "    -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}'"
 echo ""
 

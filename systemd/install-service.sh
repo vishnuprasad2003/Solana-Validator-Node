@@ -50,17 +50,29 @@ cat > "$SERVICE_FILE" << EOF
 [Unit]
 Description=Solana Test Validator
 After=network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
 User=$SERVICE_USER
-WorkingDirectory=$SERVICE_USER_HOME
+WorkingDirectory=$REPO_DIR
 Environment="PATH=$SERVICE_USER_HOME/.local/share/solana/install/active_release/bin:$SERVICE_USER_HOME/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
 ExecStart=$REPO_DIR/start-validator.sh
 Restart=always
 RestartSec=10
+
+# Resource Limits (prevents affecting other services)
+MemoryLimit=4G
+CPUQuota=200%
+
+# Security Settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
 StandardOutput=journal
 StandardError=journal
+SyslogIdentifier=solana-validator
 
 [Install]
 WantedBy=multi-user.target

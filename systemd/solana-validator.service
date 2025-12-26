@@ -1,6 +1,7 @@
 [Unit]
 Description=Solana Test Validator
 After=network.target
+Wants=network-online.target
 
 [Service]
 Type=simple
@@ -10,6 +11,18 @@ Environment="PATH=%HOME%/.local/share/solana/install/active_release/bin:%HOME%/.
 ExecStart=%HOME%/start-validator.sh
 Restart=always
 RestartSec=10
+StandardOutput=journal
+StandardError=journal
+
+# Resource Limits (prevents affecting other services)
+MemoryLimit=4G
+CPUQuota=200%
+
+# Security Settings
+NoNewPrivileges=true
+PrivateTmp=true
+
+# Logging
 StandardOutput=journal
 StandardError=journal
 

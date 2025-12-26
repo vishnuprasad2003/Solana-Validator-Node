@@ -86,20 +86,25 @@ else
     exit 1
 fi
 
-# Step 3: Install Anchor (for program development)
+# Step 3: Install Anchor (optional, for program development)
 echo ""
-echo -e "${YELLOW}[3/4] Installing Anchor framework...${NC}"
-if command -v anchor &> /dev/null; then
-    echo -e "${GREEN}✓ Anchor is already installed${NC}"
-    anchor --version
+echo -e "${YELLOW}[3/4] Installing Anchor framework (optional)...${NC}"
+read -p "Install Anchor framework for program development? (y/N): " install_anchor
+if [[ "$install_anchor" =~ ^[Yy]$ ]]; then
+    if command -v anchor &> /dev/null; then
+        echo -e "${GREEN}✓ Anchor is already installed${NC}"
+        anchor --version
+    else
+        echo -e "${YELLOW}Installing Anchor...${NC}"
+        cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
+        export PATH="$HOME/.cargo/bin:$PATH"
+        avm install latest
+        avm use latest
+        echo -e "${GREEN}✓ Anchor installed successfully${NC}"
+        anchor --version
+    fi
 else
-    echo -e "${YELLOW}Installing Anchor...${NC}"
-    cargo install --git https://github.com/coral-xyz/anchor avm --locked --force
-    export PATH="$HOME/.cargo/bin:$PATH"
-    avm install latest
-    avm use latest
-    echo -e "${GREEN}✓ Anchor installed successfully${NC}"
-    anchor --version
+    echo -e "${YELLOW}⚠ Skipping Anchor installation (validator-only mode)${NC}"
 fi
 
 # Step 4: Configure PATH in shell profile

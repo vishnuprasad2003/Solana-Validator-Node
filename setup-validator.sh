@@ -105,9 +105,20 @@ else
     fi
 fi
 
-# Step 6: Create validator start script
+# Step 6: Check port availability
 echo ""
-echo -e "${YELLOW}[6/6] Creating validator management scripts...${NC}"
+echo -e "${YELLOW}[6/7] Checking port availability...${NC}"
+if [ -f "$SCRIPT_DIR/check-ports.sh" ]; then
+    bash "$SCRIPT_DIR/check-ports.sh" || {
+        echo -e "${YELLOW}⚠ Port conflicts detected. Please resolve before starting validator.${NC}"
+    }
+else
+    echo -e "${YELLOW}⚠ Port checker not found. Skipping port check.${NC}"
+fi
+
+# Step 7: Create validator start script
+echo ""
+echo -e "${YELLOW}[7/7] Creating validator management scripts...${NC}"
 
 # Get the directory where this script is located
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"

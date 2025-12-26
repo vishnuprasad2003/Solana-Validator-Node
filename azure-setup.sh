@@ -83,19 +83,40 @@ echo ""
 echo -e "${YELLOW}[3/5] Configuring firewall...${NC}"
 
 if command -v ufw &> /dev/null; then
-    echo "Configuring UFW firewall..."
-    sudo ufw allow 22/tcp comment "SSH" 2>/dev/null || true
-    sudo ufw allow 8899/tcp comment "Solana RPC" 2>/dev/null || true
-    sudo ufw allow 9900/tcp comment "Solana Faucet" 2>/dev/null || true
+    echo "Adding Solana-specific firewall rules (preserving existing rules)..."
     
-    if ! sudo ufw status | grep -q "Status: active"; then
-        echo -e "${YELLOW}Enabling UFW firewall...${NC}"
-        echo "y" | sudo ufw enable 2>/dev/null || true
+    # Only add rules if they don't exist (non-intrusive)
+    if ! sudo ufw status | grep -q "8899/tcp"; then
+        sudo ufw allow 8899/tcp comment "Solana RPC" 2>/dev/null || true
+        echo -e "${GREEN}✓ Added RPC port rule${NC}"
+    else
+        echo -e "${GREEN}✓ RPC port rule already exists${NC}"
     fi
     
-    echo -e "${GREEN}✓ Firewall configured${NC}"
+    if ! sudo ufw status | grep -q "9900/tcp"; then
+        sudo ufw allow 9900/tcp comment "Solana Faucet" 2>/dev/null || true
+        echo -e "${GREEN}✓ Added faucet port rule${NC}"
+    else
+        echo -e "${GREEN}✓ Faucet port rule already exists${NC}"
+    fi
+    
+    # Ensure SSH is allowed (critical)
+    if ! sudo ufw status | grep -q "22/tcp"; then
+        sudo ufw allow 22/tcp comment "SSH" 2>/dev/null || true
+        echo -e "${GREEN}✓ Ensured SSH access${NC}"
+    fi
+    
+    # Don't force enable - let user decide
+    if ! sudo ufw status | grep -q "Status: active"; then
+        echo -e "${YELLOW}⚠ UFW is not active. Enable manually if needed: sudo ufw enable${NC}"
+    else
+        echo -e "${GREEN}✓ Firewall is active${NC}"
+    fi
+    
+    echo -e "${BLUE}Note: Only Solana-specific rules added. Other services unaffected.${NC}"
 else
     echo -e "${YELLOW}⚠ UFW not installed. Install with: sudo apt install ufw${NC}"
+    echo -e "${YELLOW}  Or use Azure NSG for firewall rules${NC}"
 fi
 
 # Step 4: Azure NSG reminder
@@ -148,20 +169,25 @@ if [ -n "$PUBLIC_IP" ]; then
 fi
 echo "  • RPC Port: 8899"
 echo ""
-echo "Next Steps:"
+echo -e "${BLUE}Next Steps:${NC}"
 echo "1. Configure Azure NSG (see above)"
-echo "2. Initialize validator: ./install.sh && ./setup-validator.sh"
-echo "3. Start validator: ./start-validator-tmux.sh"
-echo "   OR for production: sudo systemd/install-service.sh"
-echo "4. Test RPC:"
-if [ -n "$PUBLIC_IP" ]; then
-    echo "   curl -X POST http://$PUBLIC_IP:8899 \\"
-else
-    echo "   curl -X POST http://<your-public-ip>:8899 \\"
-fi
-echo "     -H 'Content-Type: application/json' \\"
-echo "     -d '{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}'"
+echo "2. Initialize validator: ${GREEN}./install.sh && ./setup-validator.sh${NC}"
+echo "3. Start validator:"
+echo "   ${GREEN}./start-validator.sh${NC} (for testing)"
+echo "   OR for production:"
+echo "   ${GREEN}sudo systemd/install-service.sh${NC}"
+echo "   ${GREEN}sudo systemctl start solana-validator${NC}"
+echo "   ${GREEN}sudo systemctl enable solana-validator${NC}"
+echo "4. Verify setup: ${GREEN}./verify-setup.sh${NC}"
 echo ""
-echo "For Postman Web, use: http://$PUBLIC_IP:8899"
+echo -e "${GREEN}RPC Endpoints:${NC}"
+echo "  • From Azure VM:        http://127.0.0.1:8899"
+echo "  • From Azure network:    http://$PRIVATE_IP:8899"
+if [ -n "$PUBLIC_IP" ] && [ "$PUBLIC_IP" != "N/A" ]; then
+    echo -e "  • From Internet (${YELLOW}USE THIS${NC}): http://$PUBLIC_IP:8899"
+    echo ""
+    echo -e "${BLUE}For reqbin.com / Postman Web:${NC}"
+    echo -e "  ${GREEN}http://$PUBLIC_IP:8899${NC}"
+fi
 echo ""
 
