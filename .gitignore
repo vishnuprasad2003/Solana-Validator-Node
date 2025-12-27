@@ -1,0 +1,70 @@
+# Logs
+logs/
+*.log
+
+# Backups
+backups/
+solana-backups/
+*.tar.gz
+*.backup
+
+# Ledger data
+solana-ledger/
+solana-local-ledger/
+
+# Configuration (sensitive)
+.config/solana/
+solana-security-config/
+
+# System files
+.DS_Store
+*.swp
+*.swo
+*~
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# IDE files
+.vscode/
+.idea/
+*.code-workspace
+
+# Python (if using Python scripts)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+venv/
+env/
+
+# Node (if using Node scripts)
+node_modules/
+npm-debug.log
+yarn-error.log
+
+# Rust
+target/
+Cargo.lock
+
+# Solana
+*.so
+*.dylib
+
+# Environment files (if any)
+.env
+.env.local
+
+# Azure credentials (never commit!)
+.azure/
+azure-credentials.json
+
+# SSH keys (never commit!)
+*.pem
+*.key
+id_rsa*
+id_ed25519*
+
