@@ -33,8 +33,8 @@ sudo apt-get install -y git curl wget jq
 
 ```bash
 cd ~
-git clone <your-repo-url> solana-production-cluster
-cd solana-production-cluster
+git clone <your-repo-url> Solana-Validator-Node
+cd Solana-Validator-Node
 chmod +x scripts/*.sh systemd/*.sh
 ```
 

@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Solana Production Cluster - Cluster Setup Script
+# Solana Validator Node - Cluster Setup Script
 # Initializes the validator node and prepares it for operation
 
 set -euo pipefail
@@ -24,11 +24,34 @@ else
     exit 1
 fi
 
-# Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Setup logging
+mkdir -p "$REPO_ROOT/logs"
+LOG_FILE="$REPO_ROOT/logs/setup.log"
+
+# Logging functions (write to both console and log file)
+log_info() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
+}
+
+log_success() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo "$timestamp [SUCCESS] $1" >> "$LOG_FILE"
+}
+
+log_warning() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo "$timestamp [WARNING] $1" >> "$LOG_FILE"
+}
+
+log_error() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${RED}[ERROR]${NC} $1"
+    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
+}
 
 # Ensure Solana is in PATH
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
@@ -41,7 +64,7 @@ if ! command -v solana &> /dev/null; then
 fi
 
 echo "=========================================="
-echo "Solana Production Cluster - Setup"
+echo "Solana Validator Node - Setup"
 echo "=========================================="
 echo ""
 

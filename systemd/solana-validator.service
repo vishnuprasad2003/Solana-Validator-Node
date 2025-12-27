@@ -1,5 +1,5 @@
 [Unit]
-Description=Solana Production Validator
+Description=Solana Validator Node
 After=network.target
 Wants=network-online.target
 

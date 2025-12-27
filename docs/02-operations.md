@@ -107,7 +107,7 @@ Run periodic health checks:
 ./scripts/monitor.sh
 
 # Add to crontab for automated checks (every 5 minutes)
-*/5 * * * * /home/user/solana-production-cluster/scripts/monitor.sh >> /home/user/solana-production-cluster/logs/health.log 2>&1
+*/5 * * * * /home/user/Solana-Validator-Node/scripts/monitor.sh >> /home/user/Solana-Validator-Node/logs/health.log 2>&1
 ```
 
 ### Resource Monitoring
@@ -176,7 +176,7 @@ tar -czf ~/solana-backups/ledger-$(date +%Y%m%d-%H%M%S).tar.gz ~/solana-ledger
 # Backup configuration
 tar -czf ~/solana-backups/config-$(date +%Y%m%d-%H%M%S).tar.gz \
   ~/.config/solana \
-  solana-production-cluster/configs/
+  Solana-Validator-Node/configs/
 ```
 
 ### Backup Strategy

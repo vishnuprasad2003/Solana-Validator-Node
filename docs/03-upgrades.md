@@ -55,7 +55,7 @@ tar -czf ~/solana-backups/manual-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
 # Backup configuration
 tar -czf ~/solana-backups/config-backup-$(date +%Y%m%d-%H%M%S).tar.gz \
   ~/.config/solana \
-  solana-production-cluster/configs/
+  Solana-Validator-Node/configs/
 ```
 
 ### Step 4: Run Upgrade Script
@@ -233,7 +233,7 @@ Set up automated version checking:
 
 ```bash
 # Add to crontab (weekly check)
-0 0 * * 0 /home/user/solana-production-cluster/scripts/check-updates.sh
+0 0 * * 0 /home/user/Solana-Validator-Node/scripts/check-updates.sh
 ```
 
 Create `scripts/check-updates.sh`:

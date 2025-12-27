@@ -1,6 +1,6 @@
-# Solana Production Cluster
+# Solana Validator Node
 
-A production-ready repository for deploying, operating, maintaining, and upgrading a private Solana validator cluster on Azure Virtual Machines.
+A production-ready repository for deploying, operating, maintaining, and upgrading a private Solana validator node on Azure Virtual Machines.
 
 ## 🎯 Overview
 
@@ -26,7 +26,7 @@ This repository provides everything needed to set up and operate a production-gr
 
 ```bash
 git clone <your-repo-url>
-cd solana-production-cluster
+cd Solana-Validator-Node
 chmod +x scripts/*.sh systemd/*.sh
 ```
 
@@ -71,7 +71,7 @@ sudo systemctl enable solana-validator
 ## 🏗️ Repository Structure
 
 ```
-solana-production-cluster/
+Solana-Validator-Node/
 ├── README.md                 # Main documentation
 ├── scripts/                  # Operational scripts
 │   ├── install.sh            # Install dependencies
@@ -114,12 +114,32 @@ solana-production-cluster/
 - Systemd service isolation
 - Secure keypair management
 
+## 💡 Important Notes
+
+### Paths with Spaces
+
+If your repository path contains spaces (e.g., `/path/to/Block Chain/Solana-Validator-Node`), always quote paths when using them in commands:
+
+```bash
+# ✅ Correct (with quotes)
+tail -f "/home/user/Documents/Block Chain/Solana-Validator-Node/logs/validator.log"
+
+# ✅ Better (use relative path)
+cd Solana-Validator-Node
+tail -f logs/validator.log
+
+# ❌ Incorrect (will fail with spaces)
+tail -f /home/user/Documents/Block Chain/Solana-Validator-Node/logs/validator.log
+```
+
+All scripts handle paths with spaces automatically, but when manually running commands, remember to quote paths.
+
 ## 📞 Support
 
 For issues or questions:
 1. Check [Troubleshooting Guide](docs/04-troubleshooting.md)
 2. Review [Operations Manual](docs/02-operations.md)
-3. Check logs: `sudo journalctl -u solana-validator -f`
+3. Check logs: `sudo journalctl -u solana-validator -f` or `tail -f logs/validator.log`
 
 ## 📝 License
 

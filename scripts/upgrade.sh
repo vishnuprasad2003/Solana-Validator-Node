@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Solana Production Cluster - Upgrade Script
+# Solana Validator Node - Upgrade Script
 # Safely upgrades Solana version with rollback capability
 
 set -euo pipefail
@@ -24,17 +24,40 @@ else
     exit 1
 fi
 
-# Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Setup logging
+mkdir -p "$REPO_ROOT/logs"
+LOG_FILE="$REPO_ROOT/logs/upgrade.log"
+
+# Logging functions (write to both console and log file)
+log_info() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
+}
+
+log_success() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo "$timestamp [SUCCESS] $1" >> "$LOG_FILE"
+}
+
+log_warning() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo "$timestamp [WARNING] $1" >> "$LOG_FILE"
+}
+
+log_error() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${RED}[ERROR]${NC} $1"
+    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
+}
 
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 
 echo "=========================================="
-echo "Solana Production Cluster - Upgrade"
+echo "Solana Validator Node - Upgrade"
 echo "=========================================="
 echo ""
 
@@ -177,7 +200,7 @@ echo ""
 echo "Next steps:"
 echo "1. Test the new version: ./scripts/verify-setup.sh"
 echo "2. Start validator: ./scripts/start-validator.sh"
-echo "3. Monitor logs: tail -f $REPO_ROOT/logs/validator.log"
+echo "3. Monitor logs: tail -f \"$REPO_ROOT/logs/validator.log\""
 echo ""
 echo "If you encounter issues, you can rollback using:"
 echo "  tar -xzf $BACKUP_FILE -C $HOME/.local/share/"

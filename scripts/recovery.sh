@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Solana Production Cluster - Recovery Script
+# Solana Validator Node - Recovery Script
 # Handles failure scenarios and recovery procedures
 
 set -euo pipefail
@@ -24,11 +24,34 @@ else
     exit 1
 fi
 
-# Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Setup logging
+mkdir -p "$REPO_ROOT/logs"
+LOG_FILE="$REPO_ROOT/logs/recovery.log"
+
+# Logging functions (write to both console and log file)
+log_info() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
+}
+
+log_success() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo "$timestamp [SUCCESS] $1" >> "$LOG_FILE"
+}
+
+log_warning() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo "$timestamp [WARNING] $1" >> "$LOG_FILE"
+}
+
+log_error() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${RED}[ERROR]${NC} $1"
+    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
+}
 
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
@@ -125,7 +148,7 @@ if pgrep -f "solana-test-validator" > /dev/null; then
     fi
 else
     log_error "Failed to start validator"
-    log_info "Check logs: $REPO_ROOT/logs/validator.log"
+    log_info "Check logs: \"$REPO_ROOT/logs/validator.log\""
     exit 1
 fi
 
@@ -133,7 +156,7 @@ echo ""
 log_success "Recovery complete"
 echo ""
 echo "Next steps:"
-echo "1. Monitor logs: tail -f $REPO_ROOT/logs/validator.log"
+echo "1. Monitor logs: tail -f \"$REPO_ROOT/logs/validator.log\""
 echo "2. Run health check: ./scripts/monitor.sh"
 echo ""
 

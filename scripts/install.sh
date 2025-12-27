@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Solana Production Cluster - Installation Script
+# Solana Validator Node - Installation Script
 # Installs Rust, Solana CLI, and all required dependencies
 # This script is idempotent - safe to run multiple times
 
@@ -25,21 +25,33 @@ else
     exit 1
 fi
 
-# Logging function
+# Setup logging
+mkdir -p "$REPO_ROOT/logs"
+LOG_FILE="$REPO_ROOT/logs/install.log"
+
+# Logging functions (write to both console and log file)
 log_info() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
     echo -e "${BLUE}[INFO]${NC} $1"
+    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
 }
 
 log_success() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
     echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo "$timestamp [SUCCESS] $1" >> "$LOG_FILE"
 }
 
 log_warning() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
     echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo "$timestamp [WARNING] $1" >> "$LOG_FILE"
 }
 
 log_error() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
     echo -e "${RED}[ERROR]${NC} $1"
+    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
 }
 
 # Check if running as root
@@ -49,7 +61,7 @@ if [ "$EUID" -eq 0 ]; then
 fi
 
 echo "=========================================="
-echo "Solana Production Cluster - Installation"
+echo "Solana Validator Node - Installation"
 echo "=========================================="
 echo ""
 

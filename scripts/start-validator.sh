@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Solana Production Cluster - Start Validator Script
+# Solana Validator Node - Start Validator Script
 # Safely starts the Solana validator with proper configuration
 
 set -euo pipefail
@@ -24,11 +24,34 @@ else
     exit 1
 fi
 
-# Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[SUCCESS]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARNING]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Setup logging
+mkdir -p "$REPO_ROOT/logs"
+LOG_FILE="$REPO_ROOT/logs/start-validator.log"
+
+# Logging functions (write to both console and log file)
+log_info() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
+}
+
+log_success() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${GREEN}[SUCCESS]${NC} $1"
+    echo "$timestamp [SUCCESS] $1" >> "$LOG_FILE"
+}
+
+log_warning() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${YELLOW}[WARNING]${NC} $1"
+    echo "$timestamp [WARNING] $1" >> "$LOG_FILE"
+}
+
+log_error() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${RED}[ERROR]${NC} $1"
+    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
+}
 
 # Ensure Solana is in PATH
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
@@ -124,21 +147,24 @@ fi
 
 # Create logs directory
 mkdir -p "$REPO_ROOT/logs"
+VALIDATOR_LOG="$REPO_ROOT/logs/validator.log"
 
 # Check if running from systemd (better detection)
 if [ -n "${SYSTEMD_EXEC_PID:-}" ] || [ -n "${INVOCATION_ID:-}" ] || [ "${1:-}" = "--systemd" ]; then
-    # Running from systemd - run in foreground
+    # Running from systemd - run in foreground but also log to file
     log_info "Running from systemd - starting validator in foreground"
     log_info "Executing: $VALIDATOR_CMD"
-    exec $VALIDATOR_CMD
+    log_info "Logs will be written to: $VALIDATOR_LOG"
+    # Redirect output to both journald (via systemd) and log file
+    exec $VALIDATOR_CMD >> "$VALIDATOR_LOG" 2>&1
 else
     # Running manually - run in background
     log_info "Executing: $VALIDATOR_CMD"
-    log_info "Logs will be written to: $REPO_ROOT/logs/validator.log"
+    log_info "Logs will be written to: $VALIDATOR_LOG"
     echo ""
 
     # Run validator in background and redirect output
-    nohup $VALIDATOR_CMD > "$REPO_ROOT/logs/validator.log" 2>&1 &
+    nohup $VALIDATOR_CMD > "$VALIDATOR_LOG" 2>&1 &
     VALIDATOR_PID=$!
 
     # Wait a moment for validator to start
@@ -148,25 +174,32 @@ else
     if ps -p $VALIDATOR_PID > /dev/null; then
         log_success "Validator started successfully (PID: $VALIDATOR_PID)"
         echo ""
+        # Detect actual RPC endpoint for display
+        RPC_ENDPOINT="http://$RPC_BIND_ADDRESS:$RPC_PORT"
+        if [ "$RPC_BIND_ADDRESS" = "0.0.0.0" ] && [ -n "$BIND_ADDRESS" ] && [ "$BIND_ADDRESS" != "0.0.0.0" ]; then
+            RPC_ENDPOINT="http://$BIND_ADDRESS:$RPC_PORT"
+        fi
+        
         echo "Validator Information:"
         echo "  PID: $VALIDATOR_PID"
-        echo "  RPC Endpoint: http://$RPC_BIND_ADDRESS:$RPC_PORT"
-        echo "  Logs: $REPO_ROOT/logs/validator.log"
+        echo "  RPC Endpoint: $RPC_ENDPOINT"
+        echo "  Logs: \"$REPO_ROOT/logs/validator.log\""
         echo ""
-        echo "To view logs: tail -f $REPO_ROOT/logs/validator.log"
+        echo "To view logs: tail -f \"$REPO_ROOT/logs/validator.log\""
         echo "To stop: ./scripts/stop-validator.sh"
         echo ""
         
         # Wait a bit more and verify RPC is responding
         sleep 5
-        if curl -s "http://$RPC_BIND_ADDRESS:$RPC_PORT" > /dev/null 2>&1; then
-            log_success "RPC endpoint is responding"
+        RPC_TEST_URL="http://$BIND_ADDRESS:$RPC_PORT"
+        if curl -s "$RPC_TEST_URL" > /dev/null 2>&1; then
+            log_success "RPC endpoint is responding at $RPC_ENDPOINT"
         else
             log_warning "RPC endpoint not yet responding (may need more time)"
         fi
     else
         log_error "Validator failed to start"
-        echo "Check logs: $REPO_ROOT/logs/validator.log"
+        echo "Check logs: \"$REPO_ROOT/logs/validator.log\""
         exit 1
     fi
 fi

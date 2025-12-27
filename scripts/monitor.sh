@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Solana Production Cluster - Monitoring Script
+# Solana Validator Node - Monitoring Script
 # Monitors validator health and performance
 
 set -euo pipefail
@@ -26,11 +26,34 @@ fi
 
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 
-# Logging functions
-log_info() { echo -e "${BLUE}[INFO]${NC} $1"; }
-log_success() { echo -e "${GREEN}[OK]${NC} $1"; }
-log_warning() { echo -e "${YELLOW}[WARN]${NC} $1"; }
-log_error() { echo -e "${RED}[ERROR]${NC} $1"; }
+# Setup logging
+mkdir -p "$REPO_ROOT/logs"
+LOG_FILE="$REPO_ROOT/logs/monitor.log"
+
+# Logging functions (write to both console and log file)
+log_info() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${BLUE}[INFO]${NC} $1"
+    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
+}
+
+log_success() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${GREEN}[OK]${NC} $1"
+    echo "$timestamp [OK] $1" >> "$LOG_FILE"
+}
+
+log_warning() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${YELLOW}[WARN]${NC} $1"
+    echo "$timestamp [WARN] $1" >> "$LOG_FILE"
+}
+
+log_error() {
+    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
+    echo -e "${RED}[ERROR]${NC} $1"
+    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
+}
 
 # Check if validator is running
 check_process() {
@@ -45,16 +68,27 @@ check_process() {
 
 # Check RPC endpoint
 check_rpc() {
-    local RPC_URL="http://$RPC_BIND_ADDRESS:$RPC_PORT"
+    # Detect actual IP if bind address is 0.0.0.0
+    local RPC_TEST_ADDRESS="$RPC_BIND_ADDRESS"
+    if [ "$RPC_BIND_ADDRESS" = "0.0.0.0" ]; then
+        if command -v ip > /dev/null; then
+            RPC_TEST_ADDRESS=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+        elif command -v hostname > /dev/null; then
+            RPC_TEST_ADDRESS=$(hostname -I | awk '{print $1}')
+        fi
+        [ -z "$RPC_TEST_ADDRESS" ] && RPC_TEST_ADDRESS="127.0.0.1"
+    fi
+    
+    local RPC_URL="http://$RPC_TEST_ADDRESS:$RPC_PORT"
     
     if curl -s -X POST "$RPC_URL" \
         -H "Content-Type: application/json" \
         -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' \
         > /dev/null 2>&1; then
-        log_success "RPC endpoint is responding"
+        log_success "RPC endpoint is responding at $RPC_URL"
         return 0
     else
-        log_error "RPC endpoint is NOT responding"
+        log_error "RPC endpoint is NOT responding at $RPC_URL"
         return 1
     fi
 }
@@ -88,7 +122,18 @@ check_ledger_size() {
 # Get validator info
 get_validator_info() {
     if command -v solana &> /dev/null; then
-        local RPC_URL="http://$RPC_BIND_ADDRESS:$RPC_PORT"
+        # Detect actual IP if bind address is 0.0.0.0
+        local RPC_TEST_ADDRESS="$RPC_BIND_ADDRESS"
+        if [ "$RPC_BIND_ADDRESS" = "0.0.0.0" ]; then
+            if command -v ip > /dev/null; then
+                RPC_TEST_ADDRESS=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
+            elif command -v hostname > /dev/null; then
+                RPC_TEST_ADDRESS=$(hostname -I | awk '{print $1}')
+            fi
+            [ -z "$RPC_TEST_ADDRESS" ] && RPC_TEST_ADDRESS="127.0.0.1"
+        fi
+        
+        local RPC_URL="http://$RPC_TEST_ADDRESS:$RPC_PORT"
         
         # Get slot
         local SLOT=$(solana slot --url "$RPC_URL" 2>/dev/null || echo "N/A")
