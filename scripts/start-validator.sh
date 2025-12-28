@@ -57,11 +57,25 @@ log_error() {
 export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
 export PATH="$HOME/.cargo/bin:$PATH"
 
+# Check if running from systemd (better detection)
+IS_SYSTEMD=false
+if [ -n "${SYSTEMD_EXEC_PID:-}" ] || [ -n "${INVOCATION_ID:-}" ] || [ "${1:-}" = "--systemd" ]; then
+    IS_SYSTEMD=true
+fi
+
 # Check if validator is already running
 if pgrep -f "solana-test-validator" > /dev/null; then
-    log_warning "Validator appears to be already running"
-    echo "Use './scripts/stop-validator.sh' to stop it first"
-    exit 1
+    if [ "$IS_SYSTEMD" = true ]; then
+        # For systemd, if validator is already running, exit successfully (0) to prevent restart loop
+        # This handles the case where validator was started manually or is already running
+        log_info "Validator is already running, exiting successfully"
+        exit 0
+    else
+        # For manual runs, warn and exit with error
+        log_warning "Validator appears to be already running"
+        echo "Use './scripts/stop-validator.sh' to stop it first"
+        exit 1
+    fi
 fi
 
 # Verify Solana is installed
@@ -149,14 +163,17 @@ fi
 mkdir -p "$REPO_ROOT/logs"
 VALIDATOR_LOG="$REPO_ROOT/logs/validator.log"
 
-# Check if running from systemd (better detection)
-if [ -n "${SYSTEMD_EXEC_PID:-}" ] || [ -n "${INVOCATION_ID:-}" ] || [ "${1:-}" = "--systemd" ]; then
+# Check if running from systemd (use the flag we set earlier)
+if [ "$IS_SYSTEMD" = true ]; then
     # Running from systemd - run in foreground but also log to file
     log_info "Running from systemd - starting validator in foreground"
     log_info "Executing: $VALIDATOR_CMD"
     log_info "Logs will be written to: $VALIDATOR_LOG"
     # Redirect output to both journald (via systemd) and log file
+    # Use exec to replace shell process with validator (required for systemd)
     exec $VALIDATOR_CMD >> "$VALIDATOR_LOG" 2>&1
+    # This line should never be reached, but if it is, exit with error
+    exit 1
 else
     # Running manually - run in background
     log_info "Executing: $VALIDATOR_CMD"

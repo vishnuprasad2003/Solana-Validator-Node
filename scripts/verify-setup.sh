@@ -135,7 +135,7 @@ fi
 # Check firewall
 log_info "Checking firewall..."
 if command -v ufw &> /dev/null; then
-    if sudo ufw status | grep -q "$RPC_PORT/tcp"; then
+    if env HOME="$HOME" sudo ufw status 2>/dev/null | grep -q "$RPC_PORT/tcp"; then
         log_success "Firewall rule for RPC port exists"
     else
         log_warning "Firewall rule for RPC port not found"
