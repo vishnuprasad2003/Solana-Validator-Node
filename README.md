@@ -13,12 +13,13 @@ This repository provides everything needed to set up and operate a production-gr
 
 ## 📋 Prerequisites
 
-- **Azure VMs**: Pre-provisioned Ubuntu 22.04 LTS (or compatible Linux)
+- **Linux Distribution**: Ubuntu 22.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 38+, Arch Linux, or compatible
 - **Resources**: 
   - Minimum: 8GB RAM, 100GB SSD
   - Recommended: 16GB+ RAM, 500GB+ SSD
 - **Network**: Static IP address, firewall access
 - **Access**: SSH access with sudo privileges
+- **Cloud Providers**: Works on Azure, AWS, GCP, or any Linux VM
 
 ## 🚀 Quick Start
 
@@ -67,6 +68,7 @@ sudo systemctl enable solana-validator
 - **[Upgrade Guide](docs/03-upgrades.md)** - Safe upgrade procedures
 - **[Troubleshooting](docs/04-troubleshooting.md)** - Common issues and solutions
 - **[Azure Configuration](docs/05-azure-configuration.md)** - Azure-specific setup
+- **[Portability Guide](docs/06-portability.md)** - Cross-platform compatibility and best practices
 
 ## 🏗️ Repository Structure
 
@@ -74,14 +76,15 @@ sudo systemctl enable solana-validator
 Solana-Validator-Node/
 ├── README.md                 # Main documentation
 ├── scripts/                  # Operational scripts
-│   ├── install.sh            # Install dependencies
+│   ├── common.sh             # Common library (OS detection, portability)
+│   ├── install.sh            # Install dependencies (cross-platform)
 │   ├── setup-cluster.sh      # Initialize cluster
 │   ├── start-validator.sh    # Start validator
 │   ├── stop-validator.sh     # Stop validator
 │   ├── upgrade.sh            # Upgrade Solana version
 │   ├── recovery.sh           # Recovery procedures
 │   ├── monitor.sh            # Health monitoring
-│   ├── configure-networking.sh # Network setup
+│   ├── configure-networking.sh # Network setup (multi-firewall)
 │   └── verify-setup.sh       # Verification
 ├── configs/                  # Configuration
 │   └── config.env            # Main configuration
@@ -93,19 +96,22 @@ Solana-Validator-Node/
     ├── 02-operations.md
     ├── 03-upgrades.md
     ├── 04-troubleshooting.md
-    └── 05-azure-configuration.md
+    ├── 05-azure-configuration.md
+    └── 06-portability.md     # Cross-platform compatibility
 ```
 
 ## 🔧 Key Features
 
+- ✅ **Cross-platform** - Works on Ubuntu, Debian, CentOS, RHEL, Fedora, Arch Linux
 - ✅ **Production-ready defaults** - Safe configurations out of the box
-- ✅ **Automated installation** - One-command setup
+- ✅ **Automated installation** - One-command setup with automatic OS detection
 - ✅ **Public RPC access** - Accessible from anywhere (like devnet)
 - ✅ **Safe upgrades** - Rollback capability and version management
 - ✅ **Failure recovery** - Automated recovery procedures
 - ✅ **Monitoring** - Health checks and status monitoring
-- ✅ **Azure optimized** - Network security groups and load balancer configs
+- ✅ **Multi-firewall support** - Automatically configures UFW, firewalld, or iptables
 - ✅ **Multi-node support** - Cluster configuration for multiple validators
+- ✅ **Portable scripts** - Handles paths with spaces, different shells, and architectures
 
 ## 🔐 Security
 
@@ -116,9 +122,19 @@ Solana-Validator-Node/
 
 ## 💡 Important Notes
 
+### Cross-Platform Compatibility
+
+All scripts are designed to work across different Linux distributions:
+- **Automatic OS detection** - Detects your Linux distribution
+- **Package manager detection** - Uses apt, yum, dnf, pacman, or zypper automatically
+- **Firewall detection** - Configures UFW, firewalld, or iptables based on what's available
+- **Architecture support** - Works on x86_64, ARM64, and ARM architectures
+
+See [Portability Guide](docs/06-portability.md) for detailed information.
+
 ### Paths with Spaces
 
-If your repository path contains spaces (e.g., `/path/to/Block Chain/Solana-Validator-Node`), always quote paths when using them in commands:
+All scripts handle paths with spaces automatically. When manually running commands, always quote paths:
 
 ```bash
 # ✅ Correct (with quotes)
@@ -131,8 +147,6 @@ tail -f logs/validator.log
 # ❌ Incorrect (will fail with spaces)
 tail -f /home/user/Documents/Block Chain/Solana-Validator-Node/logs/validator.log
 ```
-
-All scripts handle paths with spaces automatically, but when manually running commands, remember to quote paths.
 
 ## 📞 Support
 

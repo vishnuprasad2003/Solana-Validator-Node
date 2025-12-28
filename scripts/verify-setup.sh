@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Solana Validator Node - Verification Script
 # Verifies that the cluster is properly set up and running

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Solana Validator Node - Upgrade Script
 # Safely upgrades Solana version with rollback capability

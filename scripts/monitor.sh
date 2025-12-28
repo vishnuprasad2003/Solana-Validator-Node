@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Solana Validator Node - Monitoring Script
 # Monitors validator health and performance

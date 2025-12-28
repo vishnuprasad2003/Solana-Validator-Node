@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Solana Validator Node - Stop Validator Script
 # Gracefully stops the Solana validator

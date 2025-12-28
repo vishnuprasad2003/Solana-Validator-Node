@@ -1,9 +1,25 @@
-#!/bin/bash
-
+#!/usr/bin/env bash
+#
 # Solana Validator Node - Cluster Setup Script
 # Initializes the validator node and prepares it for operation
+# Portable across Linux distributions
+#
 
 set -euo pipefail
+
+# Script directory (handles spaces in path)
+readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+
+# Load common library
+# shellcheck source=common.sh
+if ! source "$SCRIPT_DIR/common.sh"; then
+    echo "Error: Failed to load common library" >&2
+    exit 1
+fi
+
+# Initialize common library
+init_common
 
 # Colors for output
 readonly RED='\033[0;31m'
@@ -12,23 +28,17 @@ readonly YELLOW='\033[1;33m'
 readonly BLUE='\033[0;34m'
 readonly NC='\033[0m'
 
-# Script directory
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-
 # Load configuration
-if [ -f "$REPO_ROOT/configs/config.env" ]; then
-    source "$REPO_ROOT/configs/config.env"
-else
-    echo -e "${RED}Error: config.env not found${NC}"
+if ! safe_source "$REPO_ROOT/configs/config.env"; then
+    echo -e "${RED}Error: config.env not found${NC}" >&2
     exit 1
 fi
 
 # Setup logging
-mkdir -p "$REPO_ROOT/logs"
-LOG_FILE="$REPO_ROOT/logs/setup.log"
+safe_mkdir "$REPO_ROOT/logs"
+readonly LOG_FILE="$REPO_ROOT/logs/setup.log"
 
-# Logging functions (write to both console and log file)
+# Override logging functions from common.sh
 log_info() {
     local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
     echo -e "${BLUE}[INFO]${NC} $1"
@@ -54,11 +64,11 @@ log_error() {
 }
 
 # Ensure Solana is in PATH
-export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
-export PATH="$HOME/.cargo/bin:$PATH"
+add_to_path "$HOME/.local/share/solana/install/active_release/bin"
+add_to_path "$HOME/.cargo/bin"
 
 # Verify Solana is installed
-if ! command -v solana &> /dev/null; then
+if ! command_exists solana; then
     log_error "Solana CLI not found. Please run ./scripts/install.sh first"
     exit 1
 fi
@@ -70,10 +80,10 @@ echo ""
 
 # Step 1: Create directories
 log_info "[1/6] Creating directories..."
-mkdir -p "$LEDGER_DIR"
-mkdir -p "$HOME/.config/solana"
-mkdir -p "$PROGRAMS_DIR"
-mkdir -p "$BACKUP_DIR"
+safe_mkdir "$LEDGER_DIR"
+safe_mkdir "$HOME/.config/solana"
+safe_mkdir "$PROGRAMS_DIR"
+safe_mkdir "$BACKUP_DIR"
 log_success "Directories created"
 echo "  Ledger: $LEDGER_DIR"
 echo "  Config: $HOME/.config/solana"

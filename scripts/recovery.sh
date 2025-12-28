@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Solana Validator Node - Recovery Script
 # Handles failure scenarios and recovery procedures

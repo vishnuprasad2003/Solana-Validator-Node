@@ -1,32 +1,62 @@
 # Initial Setup Guide
 
-This guide provides step-by-step instructions for setting up a Solana production cluster on Azure Virtual Machines.
+This guide provides step-by-step instructions for setting up a Solana production cluster on any Linux system (Azure, AWS, GCP, or local VMs).
 
 ## Prerequisites
 
 Before beginning, ensure you have:
 
-- **Azure VM**: Ubuntu 22.04 LTS (or compatible Linux distribution)
+- **Linux Distribution**: Ubuntu 22.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 38+, Arch Linux, or compatible
 - **Resources**: 
   - Minimum: 8GB RAM, 100GB SSD
   - Recommended: 16GB+ RAM, 500GB+ SSD
 - **Network**: Static IP address assigned to VM
 - **Access**: SSH access with sudo privileges
-- **Firewall**: Ability to configure Azure Network Security Groups (optional but recommended)
+- **Firewall**: Scripts automatically detect and configure UFW, firewalld, or iptables
+
+> **Note**: All scripts are cross-platform and automatically detect your OS, package manager, and firewall tool. See [Portability Guide](../docs/06-portability.md) for details.
 
 ## Step 1: Prepare the VM
 
+> **Note**: The installation script (`install.sh`) automatically handles system updates and package installation for your distribution. You can skip manual preparation steps if desired.
+
 ### 1.1 Update System
 
+The installation script will handle this automatically, but you can manually update:
+
+**Debian/Ubuntu:**
 ```bash
 sudo apt-get update
 sudo apt-get upgrade -y
 ```
 
+**RHEL/CentOS/Fedora:**
+```bash
+sudo dnf update -y  # or: sudo yum update -y
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -Syu
+```
+
 ### 1.2 Install Basic Tools
 
+The installation script will install required packages automatically, but you can install basic tools manually:
+
+**Debian/Ubuntu:**
 ```bash
 sudo apt-get install -y git curl wget jq
+```
+
+**RHEL/CentOS/Fedora:**
+```bash
+sudo dnf install -y git curl wget jq  # or: sudo yum install -y git curl wget jq
+```
+
+**Arch Linux:**
+```bash
+sudo pacman -S git curl wget jq
 ```
 
 ## Step 2: Clone Repository

@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 # Solana Validator Node - Start Validator Script
 # Safely starts the Solana validator with proper configuration
