@@ -13,8 +13,8 @@ Run these commands to gather information:
 # Detailed verification
 ./scripts/verify-setup.sh
 
-# Check logs
-tail -100 logs/validator.log
+# Check validator status
+./scripts/monitor.sh
 
 # Check systemd status
 sudo systemctl status solana-validator
@@ -35,8 +35,8 @@ sudo systemctl status solana-validator
 # Check if process is running
 pgrep -f solana-test-validator
 
-# Check logs
-tail -50 logs/validator.log
+# Check validator status
+./scripts/monitor.sh
 
 # Check systemd logs
 sudo journalctl -u solana-validator -n 50
@@ -424,10 +424,10 @@ Before seeking help, collect:
    cat configs/config.env
    ```
 
-4. **Logs:**
+4. **Status:**
    ```bash
-   tail -100 logs/validator.log
-   sudo journalctl -u solana-validator -n 100
+   ./scripts/monitor.sh
+   sudo systemctl status solana-validator
    ```
 
 5. **Status:**
@@ -436,12 +436,11 @@ Before seeking help, collect:
    ./scripts/verify-setup.sh
    ```
 
-### Log Locations
+### Status Monitoring
 
-- **Validator logs:** `logs/validator.log`
+- **Validator status:** `./scripts/monitor.sh`
+- **Systemd status:** `sudo systemctl status solana-validator`
 - **Systemd logs:** `sudo journalctl -u solana-validator`
-- **Upgrade logs:** `logs/upgrades.log`
-- **Health check logs:** `logs/health.log` (if configured)
 
 ### Useful Commands
 

@@ -1,164 +1,217 @@
 # Solana Validator Node
 
-A production-ready repository for deploying, operating, maintaining, and upgrading a private Solana validator node on Azure Virtual Machines.
+Production-ready repository for deploying and operating private Solana validator nodes with multi-node cluster support.
 
 ## 🎯 Overview
 
-This repository provides everything needed to set up and operate a production-grade private Solana blockchain cluster. It is designed for:
+This repository provides everything needed to set up and operate production-grade private Solana blockchain validators. Supports both single-node and multi-node cluster configurations with consensus mechanism.
 
-- **Production use** - Safe defaults, error handling, and recovery procedures
-- **Team operations** - Clear documentation and repeatable procedures
-- **Long-term maintenance** - Upgrade paths and version management
-- **External access** - Public RPC endpoints similar to Solana devnet/mainnet
+**Features:**
+- ✅ Single-node validator for local development
+- ✅ Multi-node cluster with consensus mechanism
+- ✅ Compact, maintainable scripts
+- ✅ Clean, minimal output
+- ✅ Automated setup and management
 
 ## 📋 Prerequisites
 
-- **Linux Distribution**: Ubuntu 22.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 38+, Arch Linux, or compatible
+- **Linux**: Ubuntu 22.04+, Debian 11+, CentOS 8+, RHEL 8+, Fedora 38+, Arch Linux
 - **Resources**: 
   - Minimum: 8GB RAM, 100GB SSD
   - Recommended: 16GB+ RAM, 500GB+ SSD
-- **Network**: Static IP address, firewall access
-- **Access**: SSH access with sudo privileges
-- **Cloud Providers**: Works on Azure, AWS, GCP, or any Linux VM
+- **Access**: SSH with sudo privileges
 
 ## 🚀 Quick Start
 
-### 1. Clone Repository
+### Single Node Setup
 
 ```bash
+# Clone repository
 git clone <your-repo-url>
 cd Solana-Validator-Node
-chmod +x scripts/*.sh systemd/*.sh
-```
+chmod +x scripts/*.sh
 
-### 2. Initial Setup
-
-```bash
-# Install dependencies and Solana CLI
+# Install dependencies
 ./scripts/install.sh
 
-# Configure the cluster
+# Setup cluster
 ./scripts/setup-cluster.sh
 
-# Configure Azure networking (public RPC access)
-./scripts/configure-networking.sh
-
-# Setup log rotation (optional, keeps logs minimal)
-sudo ./scripts/setup-log-rotation.sh
-```
-
-### 3. Start Services
-
-```bash
-# Install systemd service
-sudo systemd/install-service.sh
-
 # Start validator
-sudo systemctl start solana-validator
-sudo systemctl enable solana-validator
-```
+./scripts/start-validator.sh
 
-### 4. Verify Installation
-
-```bash
+# Verify
 ./scripts/verify-setup.sh
 ```
 
-## 📖 Documentation
+### Multi-Node Cluster Setup
 
-- **[Initial Setup Guide](docs/01-initial-setup.md)** - Complete setup instructions
-- **[Operations Manual](docs/02-operations.md)** - Day-to-day operations
-- **[Upgrade Guide](docs/03-upgrades.md)** - Safe upgrade procedures
-- **[Troubleshooting](docs/04-troubleshooting.md)** - Common issues and solutions
-- **[Azure Configuration](docs/05-azure-configuration.md)** - Azure-specific setup
-- **[Portability Guide](docs/06-portability.md)** - Cross-platform compatibility and best practices
+#### Bootstrap Node (First Node)
+
+```bash
+# On first node
+./scripts/install.sh
+./scripts/setup-cluster.sh
+
+# Edit configs/config.env
+CLUSTER_MODE=true
+NODE_ROLE=bootstrap
+GOSSIP_PORT=8001
+
+# Start bootstrap node
+./scripts/start-validator.sh
+
+# Get node info
+./scripts/list-nodes.sh
+```
+
+#### Additional Validator Nodes
+
+```bash
+# On each additional node
+./scripts/install.sh
+./scripts/setup-cluster.sh
+
+# Add to cluster (replace with bootstrap node IP)
+./scripts/add-node.sh <bootstrap_ip>:8001
+
+# Start validator
+./scripts/start-validator.sh
+```
 
 ## 🏗️ Repository Structure
 
 ```
 Solana-Validator-Node/
-├── README.md                 # Main documentation
-├── scripts/                  # Operational scripts
-│   ├── common.sh             # Common library (OS detection, portability)
-│   ├── install.sh            # Install dependencies (cross-platform)
-│   ├── setup-cluster.sh      # Initialize cluster
-│   ├── start-validator.sh    # Start validator
-│   ├── stop-validator.sh     # Stop validator
-│   ├── upgrade.sh            # Upgrade Solana version
-│   ├── recovery.sh           # Recovery procedures
-│   ├── monitor.sh            # Health monitoring
-│   ├── configure-networking.sh # Network setup (multi-firewall)
-│   └── verify-setup.sh       # Verification
-├── configs/                  # Configuration
-│   └── config.env            # Main configuration
-├── systemd/                  # Systemd service
+├── README.md
+├── configs/
+│   └── config.env                    # Main configuration
+├── scripts/
+│   ├── common.sh                     # Shared library functions
+│   ├── install.sh                   # Install dependencies
+│   ├── setup-cluster.sh             # Initialize cluster
+│   ├── start-validator.sh           # Start validator
+│   ├── stop-validator.sh            # Stop validator
+│   ├── verify-setup.sh              # Verify installation
+│   ├── monitor.sh                   # Health monitoring
+│   ├── airdrop.sh                   # Airdrop SOL
+│   ├── add-node.sh                  # Add node to cluster
+│   ├── list-nodes.sh                # List cluster nodes
+│   ├── upgrade.sh                   # Upgrade Solana
+│   └── recovery.sh                  # Recovery procedures
+├── systemd/
 │   ├── solana-validator.service
 │   └── install-service.sh
-└── docs/                     # Detailed documentation
+└── docs/
     ├── 01-initial-setup.md
     ├── 02-operations.md
     ├── 03-upgrades.md
     ├── 04-troubleshooting.md
-    ├── 05-azure-configuration.md
-    └── 06-portability.md     # Cross-platform compatibility
+    └── 05-private-cluster-setup.md
 ```
 
-## 🔧 Key Features
+## 🔧 Configuration
 
-- ✅ **Cross-platform** - Works on Ubuntu, Debian, CentOS, RHEL, Fedora, Arch Linux
-- ✅ **Production-ready defaults** - Safe configurations out of the box
-- ✅ **Automated installation** - One-command setup with automatic OS detection
-- ✅ **Public RPC access** - Accessible from anywhere (like devnet)
-- ✅ **Safe upgrades** - Rollback capability and version management
-- ✅ **Failure recovery** - Automated recovery procedures
-- ✅ **Monitoring** - Health checks and status monitoring
-- ✅ **Multi-firewall support** - Automatically configures UFW, firewalld, or iptables
-- ✅ **Multi-node support** - Cluster configuration for multiple validators
-- ✅ **Portable scripts** - Handles paths with spaces, different shells, and architectures
+Edit `configs/config.env` for configuration:
 
-## 🔐 Security
-
-- Firewall rules configured automatically
-- Optional IP whitelist for RPC access
-- Systemd service isolation
-- Secure keypair management
-
-## 💡 Important Notes
-
-### Cross-Platform Compatibility
-
-All scripts are designed to work across different Linux distributions:
-- **Automatic OS detection** - Detects your Linux distribution
-- **Package manager detection** - Uses apt, yum, dnf, pacman, or zypper automatically
-- **Firewall detection** - Configures UFW, firewalld, or iptables based on what's available
-- **Architecture support** - Works on x86_64, ARM64, and ARM architectures
-
-See [Portability Guide](docs/06-portability.md) for detailed information.
-
-### Paths with Spaces
-
-All scripts handle paths with spaces automatically. When manually running commands, always quote paths:
-
+### Single Node
 ```bash
-# ✅ Correct (with quotes)
-tail -f "/home/user/Documents/Block Chain/Solana-Validator-Node/logs/validator.log"
-
-# ✅ Better (use relative path)
-cd Solana-Validator-Node
-tail -f logs/validator.log
-
-# ❌ Incorrect (will fail with spaces)
-tail -f /home/user/Documents/Block Chain/Solana-Validator-Node/logs/validator.log
+CLUSTER_MODE=false
+RPC_PORT=8899
+RPC_BIND_ADDRESS="127.0.0.1"
 ```
 
-## 📞 Support
+### Multi-Node Cluster
 
-For issues or questions:
-1. Check [Troubleshooting Guide](docs/04-troubleshooting.md)
-2. Review [Operations Manual](docs/02-operations.md)
-3. Check logs: `sudo journalctl -u solana-validator -f` or `tail -f logs/validator.log`
+**Bootstrap Node:**
+```bash
+CLUSTER_MODE=true
+NODE_ROLE=bootstrap
+GOSSIP_PORT=8001
+RPC_PORT=8899
+```
+
+**Validator Nodes:**
+```bash
+CLUSTER_MODE=true
+NODE_ROLE=validator
+BOOTSTRAP_NODE="<bootstrap_ip>:8001"
+GOSSIP_PORT=8001
+RPC_PORT=8899
+```
+
+## 📝 Scripts
+
+### Core Scripts
+- **`start-validator.sh`** - Start validator (supports single/cluster mode)
+- **`stop-validator.sh`** - Stop validator (`--force` for force kill)
+- **`verify-setup.sh`** - Verify installation
+- **`monitor.sh`** - Health check
+
+### Cluster Scripts
+- **`add-node.sh <bootstrap_ip:port>`** - Configure node to join cluster
+- **`list-nodes.sh`** - List cluster nodes and status
+
+### Utility Scripts
+- **`airdrop.sh <address> [amount]`** - Airdrop SOL
+- **`install.sh`** - Install dependencies
+- **`setup-cluster.sh`** - Initialize cluster
+
+## 💡 Usage Examples
+
+### Single Node
+```bash
+./scripts/start-validator.sh
+./scripts/monitor.sh
+./scripts/airdrop.sh <address> 10
+```
+
+### Multi-Node Cluster
+
+**Bootstrap Node:**
+```bash
+# Start bootstrap
+./scripts/start-validator.sh
+
+# Check status
+./scripts/list-nodes.sh
+```
+
+**Add Validator Node:**
+```bash
+# Configure to join cluster
+./scripts/add-node.sh 192.168.1.100:8001
+
+# Start validator
+./scripts/start-validator.sh
+
+# Verify cluster
+./scripts/list-nodes.sh
+```
+
+## 🔐 Consensus Mechanism
+
+The cluster uses Solana's built-in consensus mechanism:
+- **Bootstrap Node**: First node that initializes the cluster
+- **Validator Nodes**: Additional nodes that join the cluster
+- **Gossip Protocol**: Nodes communicate via gossip port (default: 8001)
+- **Consensus**: All nodes participate in transaction validation and block production
+
+
+## 🔍 Troubleshooting
+
+1. **Validator not starting**: Check `./scripts/verify-setup.sh`
+2. **Cluster not connecting**: Verify bootstrap node IP and gossip port
+3. **Transaction timeouts**: Check validator is running and RPC is accessible
+4. **Health check**: Use `./scripts/monitor.sh`
+
+## 📚 Documentation
+
+- **Quick Start**: See above
+- **Private Cluster Setup**: `docs/05-private-cluster-setup.md` - Complete guide for multi-node cluster
+- **Operations**: `docs/02-operations.md` - Day-to-day operations
+- **Troubleshooting**: `docs/04-troubleshooting.md` - Common issues and solutions
 
 ## 📝 License
 
-MIT License - See LICENSE file for details
-
+MIT License

@@ -396,10 +396,9 @@ safe_source() {
 }
 
 # ============================================================================
-# LOGGING FUNCTIONS (to be overridden by scripts)
+# LOGGING FUNCTIONS (console output only)
 # ============================================================================
 
-# Default logging functions (can be overridden)
 log_info() {
     echo "[INFO] $*"
 }

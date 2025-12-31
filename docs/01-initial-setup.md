@@ -246,9 +246,9 @@ nano ~/solana-security-config/allowed-ips.txt
 
 ### Validator Won't Start
 
-1. Check logs:
+1. Check validator status:
    ```bash
-   tail -f logs/validator.log
+   ./scripts/monitor.sh
    ```
 
 2. Check if port is in use:
@@ -310,7 +310,7 @@ After successful setup:
 If you encounter issues:
 
 1. Check `docs/04-troubleshooting.md`
-2. Review logs: `logs/validator.log`
-3. Run verification: `./scripts/verify-setup.sh`
+2. Run verification: `./scripts/verify-setup.sh`
+3. Check status: `./scripts/monitor.sh`
 4. Check systemd logs: `sudo journalctl -u solana-validator`
 

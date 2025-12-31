@@ -278,9 +278,9 @@ After successful upgrade:
 
 ### Upgrade Fails During Installation
 
-1. Check logs:
+1. Check validator status:
    ```bash
-   tail -50 logs/validator.log
+   ./scripts/monitor.sh
    ```
 
 2. Verify disk space:
@@ -350,25 +350,12 @@ After successful upgrade:
 9. **Keep old backups** until new version is stable
 10. **Communicate upgrades** to stakeholders
 
-## Upgrade Log
-
-All upgrades are logged in `logs/upgrades.log`:
-
-```bash
-cat logs/upgrades.log
-```
-
-Format:
-```
-2024-01-15T10:30:00+00:00 | Upgraded from 1.18.0 to 1.18.1 | Backup: /home/user/solana-backups/solana-backup-20240115-103000.tar.gz
-```
-
 ## Support
 
 If you encounter issues during upgrade:
 
 1. Check `docs/04-troubleshooting.md`
-2. Review upgrade logs: `logs/upgrades.log`
+2. Verify installation: `./scripts/verify-setup.sh`
 3. Check Solana release notes for known issues
 4. Consider rolling back if critical issues occur
 

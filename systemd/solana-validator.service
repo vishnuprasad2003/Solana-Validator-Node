@@ -10,10 +10,19 @@ Group=%i
 WorkingDirectory=%h
 Environment="PATH=%h/.local/share/solana/install/active_release/bin:%h/.cargo/bin:/usr/local/bin:/usr/bin:/bin"
 Environment="HOME=%h"
-ExecStart=/bin/bash "%r/scripts/start-validator.sh" --systemd
-ExecStop=/bin/bash "%r/scripts/stop-validator.sh"
+ExecStart=/bin/bash "%r/scripts/start-validator.sh"
+ExecStop=/bin/bash "%r/scripts/stop-validator.sh" --service
+# Auto-restart configuration
 Restart=always
 RestartSec=10
+StartLimitInterval=300
+StartLimitBurst=5
+# Stop configuration
+TimeoutStopSec=30
+KillMode=mixed
+KillSignal=SIGTERM
+SendSIGKILL=yes
+# Logging
 StandardOutput=journal
 StandardError=journal
 SyslogIdentifier=solana-validator

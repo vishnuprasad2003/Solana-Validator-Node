@@ -33,8 +33,8 @@ curl http://localhost:8899 -X POST \
 # Get current slot
 solana slot --url http://localhost:8899
 
-# Check logs
-tail -f logs/validator.log
+# Check validator status
+./scripts/monitor.sh
 ```
 
 ### Starting the Validator
@@ -68,45 +68,6 @@ sudo systemctl stop solana-validator
 
 **Important:** Always use the stop script - never kill the process directly, as it may corrupt the ledger.
 
-### Viewing Logs
-
-**Systemd logs:**
-
-```bash
-# Follow logs
-sudo journalctl -u solana-validator -f
-
-# Last 100 lines
-sudo journalctl -u solana-validator -n 100
-
-# Logs since today
-sudo journalctl -u solana-validator --since today
-```
-
-**File logs:**
-
-```bash
-# Follow logs
-tail -f logs/validator.log
-
-# Search for errors
-grep -i error logs/validator.log
-
-# Last 50 lines
-tail -n 50 logs/validator.log
-```
-
-**Log Rotation (Optional):**
-
-To keep logs minimal and prevent disk space issues:
-
-```bash
-# Setup automatic log rotation (keeps 3 days, max 50MB)
-sudo ./scripts/setup-log-rotation.sh
-
-# Or disable logs completely in config.env:
-# DISABLE_VALIDATOR_LOGS=true
-```
 
 ## Monitoring
 
@@ -119,7 +80,7 @@ Run periodic health checks:
 ./scripts/monitor.sh
 
 # Add to crontab for automated checks (every 5 minutes)
-*/5 * * * * /home/user/Solana-Validator-Node/scripts/monitor.sh >> /home/user/Solana-Validator-Node/logs/health.log 2>&1
+*/5 * * * * /home/user/Solana-Validator-Node/scripts/monitor.sh
 ```
 
 ### Resource Monitoring
@@ -240,7 +201,7 @@ tar -xzf ~/solana-backups/config-YYYYMMDD-HHMMSS.tar.gz -C ~/
 
 2. **Review logs for errors:**
    ```bash
-   grep -i error logs/validator.log | tail -20
+   ./scripts/monitor.sh
    ```
 
 3. **Verify RPC accessibility:**
@@ -366,7 +327,7 @@ For multi-node clusters, ensure:
 
 2. Check logs:
    ```bash
-   tail -50 logs/validator.log
+   ./scripts/monitor.sh
    ```
 
 3. Restart if needed:
@@ -455,5 +416,5 @@ For multi-node clusters, ensure:
 
 - **Documentation**: See `docs/` directory
 - **Troubleshooting**: `docs/04-troubleshooting.md`
-- **Logs**: `logs/validator.log` or `sudo journalctl -u solana-validator`
+- **Status**: `./scripts/monitor.sh` or `sudo systemctl status solana-validator`
 

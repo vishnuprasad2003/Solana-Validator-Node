@@ -1,93 +1,79 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# Solana Validator Node - Stop Validator Script
-# Gracefully stops the Solana validator
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
-set -euo pipefail
+FORCE_STOP=false
+MASK_SERVICE=false
+STOP_SERVICE=false
 
-# Colors for output
-readonly RED='\033[0;31m'
-readonly GREEN='\033[0;32m'
-readonly YELLOW='\033[1;33m'
-readonly BLUE='\033[0;34m'
-readonly NC='\033[0m'
+while [[ $# -gt 0 ]]; do
+    case $1 in
+        --force) FORCE_STOP=true; shift; ;;
+        --mask) MASK_SERVICE=true; shift; ;;
+        --service) STOP_SERVICE=true; shift; ;;
+        *) echo "Usage: $0 [--force] [--mask] [--service]"; echo "  --force: Force kill validator process"; echo "  --mask: Mask systemd service (prevent auto-start)"; echo "  --service: Stop systemd service only"; exit 1; ;;
+    esac
+done
 
-# Script directory for logging
-readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
-mkdir -p "$REPO_ROOT/logs"
-LOG_FILE="$REPO_ROOT/logs/stop-validator.log"
-
-# Logging functions (write to both console and log file)
-log_info() {
-    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-    echo -e "${BLUE}[INFO]${NC} $1"
-    echo "$timestamp [INFO] $1" >> "$LOG_FILE"
-}
-
-log_success() {
-    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-    echo "$timestamp [SUCCESS] $1" >> "$LOG_FILE"
-}
-
-log_warning() {
-    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-    echo "$timestamp [WARNING] $1" >> "$LOG_FILE"
-}
-
-log_error() {
-    local timestamp="[$(date '+%Y-%m-%d %H:%M:%S')]"
-    echo -e "${RED}[ERROR]${NC} $1"
-    echo "$timestamp [ERROR] $1" >> "$LOG_FILE"
-}
-
-log_info "Stopping Solana validator..."
-
-# Find validator processes
-VALIDATOR_PIDS=$(pgrep -f "solana-test-validator" || true)
-
-if [ -z "$VALIDATOR_PIDS" ]; then
-    log_warning "No validator process found"
+# Check if validator is running
+if ! pgrep -f "solana-test-validator" > /dev/null; then
+    echo "No validator running"
     exit 0
 fi
 
-# Try graceful shutdown first
-log_info "Sending SIGTERM to validator processes..."
-for PID in $VALIDATOR_PIDS; do
-    log_info "Stopping process $PID..."
-    kill -TERM "$PID" 2>/dev/null || true
-done
-
-# Wait for processes to stop
-WAIT_TIME=0
-MAX_WAIT=30
-while [ $WAIT_TIME -lt $MAX_WAIT ]; do
-    REMAINING=$(pgrep -f "solana-test-validator" || true)
-    if [ -z "$REMAINING" ]; then
-        log_success "Validator stopped gracefully"
-        exit 0
-    fi
-    sleep 1
-    WAIT_TIME=$((WAIT_TIME + 1))
-done
-
-# Force kill if still running
-REMAINING=$(pgrep -f "solana-test-validator" || true)
-if [ -n "$REMAINING" ]; then
-    log_warning "Validator did not stop gracefully, forcing shutdown..."
-    for PID in $REMAINING; do
-        kill -9 "$PID" 2>/dev/null || true
-    done
-    sleep 2
+# Handle systemd service
+if command -v systemctl > /dev/null 2>&1 && systemctl list-units --full -all 2>/dev/null | grep -q "solana-validator.service"; then
+    SERVICE_EXISTS=true
     
-    # Verify stopped
-    if pgrep -f "solana-test-validator" > /dev/null; then
-        log_error "Failed to stop validator"
-        exit 1
-    else
-        log_success "Validator stopped (forced)"
+    if [ "$STOP_SERVICE" = "true" ] || [ "$FORCE_STOP" = "false" ]; then
+        echo "Stopping systemd service..."
+        sudo systemctl stop solana-validator.service 2>/dev/null && echo "✓ Service stopped" || echo "⚠ Service stop failed"
+        sleep 2
     fi
+    
+    if [ "$MASK_SERVICE" = "true" ]; then
+        echo "Masking systemd service (prevents auto-start)..."
+        sudo systemctl mask solana-validator.service 2>/dev/null && echo "✓ Service masked" || echo "⚠ Service mask failed"
+    fi
+    
+    if [ "$FORCE_STOP" = "true" ]; then
+        echo "Disabling systemd service..."
+        sudo systemctl disable solana-validator.service 2>/dev/null || true
+    fi
+else
+    SERVICE_EXISTS=false
 fi
 
+# Stop validator processes gracefully first
+echo "Stopping validator processes..."
+for pid in $(pgrep -f "solana-test-validator"); do
+    kill -TERM "$pid" 2>/dev/null && echo "  Sent TERM to PID $pid" || true
+done
+
+# Wait for graceful shutdown
+sleep 3
+
+# Check if still running
+if ! pgrep -f "solana-test-validator" > /dev/null; then
+    echo "✓ Validator stopped gracefully"
+    exit 0
+fi
+
+# Force stop if requested or if graceful stop failed
+if [ "$FORCE_STOP" = "true" ]; then
+    echo "Force stopping validator processes..."
+    for pid in $(pgrep -f "solana-test-validator"); do
+        kill -9 "$pid" 2>/dev/null && echo "  Force killed PID $pid" || true
+    done
+    sleep 1
+fi
+
+# Final check
+if pgrep -f "solana-test-validator" > /dev/null; then
+    echo "✗ Failed to stop validator"
+    exit 1
+else
+    echo "✓ Validator stopped"
+    exit 0
+fi
