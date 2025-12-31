@@ -42,6 +42,9 @@ chmod +x scripts/*.sh systemd/*.sh
 
 # Configure Azure networking (public RPC access)
 ./scripts/configure-networking.sh
+
+# Setup log rotation (optional, keeps logs minimal)
+sudo ./scripts/setup-log-rotation.sh
 ```
 
 ### 3. Start Services

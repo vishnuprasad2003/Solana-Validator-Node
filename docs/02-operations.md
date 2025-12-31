@@ -96,6 +96,18 @@ grep -i error logs/validator.log
 tail -n 50 logs/validator.log
 ```
 
+**Log Rotation (Optional):**
+
+To keep logs minimal and prevent disk space issues:
+
+```bash
+# Setup automatic log rotation (keeps 3 days, max 50MB)
+sudo ./scripts/setup-log-rotation.sh
+
+# Or disable logs completely in config.env:
+# DISABLE_VALIDATOR_LOGS=true
+```
+
 ## Monitoring
 
 ### Health Monitoring

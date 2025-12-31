@@ -195,15 +195,22 @@ fi
 
 # Create logs directory
 mkdir -p "$REPO_ROOT/logs"
-VALIDATOR_LOG="$REPO_ROOT/logs/validator.log"
+
+# Determine log destination based on configuration
+if [ "${DISABLE_VALIDATOR_LOGS:-false}" = "true" ]; then
+    VALIDATOR_LOG="/dev/null"
+    log_info "Validator logs disabled (discarding output to save disk space)"
+else
+    VALIDATOR_LOG="$REPO_ROOT/logs/validator.log"
+    log_info "Validator logs will be written to: $VALIDATOR_LOG"
+fi
 
 # Check if running from systemd (use the flag we set earlier)
 if [ "$IS_SYSTEMD" = true ]; then
     # Running from systemd - run in foreground but also log to file
     log_info "Running from systemd - starting validator in foreground"
     log_info "Executing: $VALIDATOR_CMD"
-    log_info "Logs will be written to: $VALIDATOR_LOG"
-    # Redirect output to both journald (via systemd) and log file
+    # Redirect output to both journald (via systemd) and log file (or /dev/null)
     # Use exec to replace shell process with validator (required for systemd)
     exec $VALIDATOR_CMD >> "$VALIDATOR_LOG" 2>&1
     # This line should never be reached, but if it is, exit with error
@@ -211,7 +218,6 @@ if [ "$IS_SYSTEMD" = true ]; then
 else
     # Running manually - run in background
     log_info "Executing: $VALIDATOR_CMD"
-    log_info "Logs will be written to: $VALIDATOR_LOG"
     echo ""
 
     # Run validator in background and redirect output
@@ -254,9 +260,13 @@ else
             echo "  - Ensure OS firewall allows port $RPC_PORT"
             echo "  - Use public IP endpoint from anywhere: $PUBLIC_RPC_ENDPOINT"
         fi
-        echo "  Logs: \"$REPO_ROOT/logs/validator.log\""
-        echo ""
-        echo "To view logs: tail -f \"$REPO_ROOT/logs/validator.log\""
+        if [ "${DISABLE_VALIDATOR_LOGS:-false}" != "true" ]; then
+            echo "  Logs: \"$REPO_ROOT/logs/validator.log\""
+            echo ""
+            echo "To view logs: tail -f \"$REPO_ROOT/logs/validator.log\""
+        else
+            echo "  Logs: Disabled (output discarded)"
+        fi
         echo "To stop: ./scripts/stop-validator.sh"
         echo ""
         
@@ -275,7 +285,11 @@ else
         fi
     else
         log_error "Validator failed to start"
-        echo "Check logs: \"$REPO_ROOT/logs/validator.log\""
+        if [ "${DISABLE_VALIDATOR_LOGS:-false}" != "true" ]; then
+            echo "Check logs: \"$REPO_ROOT/logs/validator.log\""
+        else
+            echo "Logs are disabled. Check validator process: ps aux | grep solana-test-validator"
+        fi
         exit 1
     fi
 fi
