@@ -16,6 +16,11 @@ readonly NC='\033[0m'
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
 
+# Load common functions
+if [ -f "$SCRIPT_DIR/common.sh" ]; then
+    source "$SCRIPT_DIR/common.sh"
+fi
+
 # Load configuration
 if [ -f "$REPO_ROOT/configs/config.env" ]; then
     source "$REPO_ROOT/configs/config.env"
@@ -96,8 +101,29 @@ log_info "Starting Solana validator..."
 # Detect actual IP address if bind address is 0.0.0.0
 # solana-test-validator doesn't accept 0.0.0.0, needs specific IP
 BIND_ADDRESS="$RPC_BIND_ADDRESS"
+PUBLIC_IP_DETECTED=""
+DETECTED_IP=""
+
+# Try to detect public IP (useful for Azure VMs)
+if [ -n "${PUBLIC_IP:-}" ]; then
+    PUBLIC_IP_DETECTED="$PUBLIC_IP"
+    log_info "Using configured public IP: $PUBLIC_IP_DETECTED"
+elif type detect_public_ip > /dev/null 2>&1; then
+    # Try to detect public IP from external service using common.sh function
+    PUBLIC_IP_DETECTED=$(detect_public_ip 2>/dev/null || echo "")
+    if [ -n "$PUBLIC_IP_DETECTED" ]; then
+        log_info "Detected public IP: $PUBLIC_IP_DETECTED"
+    fi
+elif command -v curl > /dev/null; then
+    # Fallback: try curl directly
+    PUBLIC_IP_DETECTED=$(curl -s --max-time 3 https://api.ipify.org 2>/dev/null || curl -s --max-time 3 https://ifconfig.me 2>/dev/null || echo "")
+    if [ -n "$PUBLIC_IP_DETECTED" ]; then
+        log_info "Detected public IP: $PUBLIC_IP_DETECTED"
+    fi
+fi
+
 if [ "$RPC_BIND_ADDRESS" = "0.0.0.0" ]; then
-    # Try to detect the primary network interface IP
+    # Try to detect the primary network interface IP (private IP for Azure VMs)
     if command -v ip > /dev/null; then
         DETECTED_IP=$(ip route get 8.8.8.8 2>/dev/null | grep -oP 'src \K\S+' | head -1)
     elif command -v hostname > /dev/null; then
@@ -105,12 +131,20 @@ if [ "$RPC_BIND_ADDRESS" = "0.0.0.0" ]; then
     fi
     
     if [ -n "$DETECTED_IP" ] && [ "$DETECTED_IP" != "127.0.0.1" ]; then
+        # Use private IP for binding (Azure will NAT public IP to private IP automatically)
         BIND_ADDRESS="$DETECTED_IP"
-        log_info "Detected IP address: $BIND_ADDRESS (for public access, RPC will still bind to 0.0.0.0)"
+        log_info "Binding to private IP: $BIND_ADDRESS (for public access)"
+        if [ -n "$PUBLIC_IP_DETECTED" ]; then
+            log_info "Public IP: $PUBLIC_IP_DETECTED (Azure will NAT this to private IP $BIND_ADDRESS)"
+            log_info "Access from anywhere using: http://$PUBLIC_IP_DETECTED:$RPC_PORT"
+        else
+            log_info "For public access, ensure Azure NSG allows inbound TCP on port $RPC_PORT"
+        fi
     else
         # Fallback to localhost if detection fails
         BIND_ADDRESS="127.0.0.1"
-        log_warning "Could not detect IP, using localhost. For public access, set RPC_BIND_ADDRESS to your actual IP in config.env"
+        log_warning "Could not detect private IP, using localhost (127.0.0.1)"
+        log_warning "For public access, set RPC_BIND_ADDRESS to your VM's private IP in config.env"
     fi
 fi
 
@@ -192,14 +226,34 @@ else
         log_success "Validator started successfully (PID: $VALIDATOR_PID)"
         echo ""
         # Detect actual RPC endpoint for display
-        RPC_ENDPOINT="http://$RPC_BIND_ADDRESS:$RPC_PORT"
+        LOCAL_RPC_ENDPOINT="http://127.0.0.1:$RPC_PORT"
+        PRIVATE_RPC_ENDPOINT=""
+        PUBLIC_RPC_ENDPOINT=""
+        
         if [ "$RPC_BIND_ADDRESS" = "0.0.0.0" ] && [ -n "$BIND_ADDRESS" ] && [ "$BIND_ADDRESS" != "0.0.0.0" ]; then
-            RPC_ENDPOINT="http://$BIND_ADDRESS:$RPC_PORT"
+            PRIVATE_RPC_ENDPOINT="http://$BIND_ADDRESS:$RPC_PORT"
+        elif [ "$RPC_BIND_ADDRESS" != "0.0.0.0" ] && [ "$RPC_BIND_ADDRESS" != "127.0.0.1" ]; then
+            PRIVATE_RPC_ENDPOINT="http://$RPC_BIND_ADDRESS:$RPC_PORT"
+        fi
+        
+        if [ -n "$PUBLIC_IP_DETECTED" ]; then
+            PUBLIC_RPC_ENDPOINT="http://$PUBLIC_IP_DETECTED:$RPC_PORT"
         fi
         
         echo "Validator Information:"
         echo "  PID: $VALIDATOR_PID"
-        echo "  RPC Endpoint: $RPC_ENDPOINT"
+        echo "  Local RPC Endpoint: $LOCAL_RPC_ENDPOINT"
+        if [ -n "$PRIVATE_RPC_ENDPOINT" ]; then
+            echo "  Private IP RPC Endpoint: $PRIVATE_RPC_ENDPOINT"
+        fi
+        if [ -n "$PUBLIC_RPC_ENDPOINT" ]; then
+            echo "  Public IP RPC Endpoint: $PUBLIC_RPC_ENDPOINT"
+            echo ""
+            echo "  ⚠️  IMPORTANT FOR AZURE VMs:"
+            echo "  - Ensure Azure NSG allows inbound TCP on port $RPC_PORT"
+            echo "  - Ensure OS firewall allows port $RPC_PORT"
+            echo "  - Use public IP endpoint from anywhere: $PUBLIC_RPC_ENDPOINT"
+        fi
         echo "  Logs: \"$REPO_ROOT/logs/validator.log\""
         echo ""
         echo "To view logs: tail -f \"$REPO_ROOT/logs/validator.log\""
@@ -208,11 +262,16 @@ else
         
         # Wait a bit more and verify RPC is responding
         sleep 5
-        RPC_TEST_URL="http://$BIND_ADDRESS:$RPC_PORT"
-        if curl -s "$RPC_TEST_URL" > /dev/null 2>&1; then
-            log_success "RPC endpoint is responding at $RPC_ENDPOINT"
+        # Test localhost endpoint
+        if curl -s "$LOCAL_RPC_ENDPOINT" > /dev/null 2>&1; then
+            log_success "RPC endpoint is responding locally at $LOCAL_RPC_ENDPOINT"
+            if [ -n "$PUBLIC_IP_DETECTED" ]; then
+                log_info "For public access, test: curl $PUBLIC_RPC_ENDPOINT"
+                log_warning "If public access fails, check Azure NSG and OS firewall rules"
+            fi
         else
             log_warning "RPC endpoint not yet responding (may need more time)"
+            log_info "Test with: curl $LOCAL_RPC_ENDPOINT"
         fi
     else
         log_error "Validator failed to start"
