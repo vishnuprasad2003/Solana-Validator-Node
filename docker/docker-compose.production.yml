@@ -1,0 +1,140 @@
+version: '3.8'
+
+# Production Docker Compose for Solana Private Cluster
+# Usage: docker-compose -f docker/docker-compose.production.yml up -d
+# Set PUBLIC_IP environment variable for external access
+
+services:
+  bootstrap:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    image: solana-validator:latest
+    container_name: solana-bootstrap
+    hostname: bootstrap
+    volumes:
+      - bootstrap-ledger:/app/data/bootstrap
+      - validator-keys:/app/keys
+      - bootstrap-logs:/app/logs
+      - ../configs:/app/configs:ro
+    ports:
+      - "${BOOTSTRAP_GOSSIP_PORT:-8001}:8001/udp"
+      - "${BOOTSTRAP_GOSSIP_PORT:-8001}:8001/tcp"
+      - "${BOOTSTRAP_RPC_PORT:-8899}:8899"
+      - "${BOOTSTRAP_RPC_WS_PORT:-8900}:8900"
+      - "${BOOTSTRAP_METRICS_PORT:-9090}:9090"
+    environment:
+      - NODE_NAME=bootstrap
+      - NODE_ROLE=bootstrap
+      - RPC_BIND_ADDRESS=0.0.0.0
+      - GOSSIP_PORT=8001
+      - RPC_PORT=8899
+      - PUBLIC_IP=${PUBLIC_IP:-}
+    command: /app/scripts/start-bootstrap.sh
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - solana-cluster
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8899", "-X", "POST", "-H", "Content-Type: application/json", "-d", "{\"jsonrpc\":\"2.0\",\"id\":1,\"method\":\"getHealth\"}"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  validator-1:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    image: solana-validator:latest
+    container_name: solana-validator-1
+    hostname: validator-1
+    volumes:
+      - validator-1-ledger:/app/data/validator/validator-1
+      - validator-keys:/app/keys
+      - validator-1-logs:/app/logs
+      - ../configs:/app/configs:ro
+    ports:
+      - "${VALIDATOR_1_GOSSIP_PORT:-8002}:8002/udp"
+      - "${VALIDATOR_1_GOSSIP_PORT:-8002}:8002/tcp"
+      - "${VALIDATOR_1_RPC_PORT:-8901}:8901"
+    environment:
+      - NODE_NAME=validator-1
+      - NODE_ROLE=validator
+      - ENTRYPOINT_HOST=bootstrap
+      - ENTRYPOINT_PORT=8001
+      - RPC_BIND_ADDRESS=0.0.0.0
+      - GOSSIP_PORT=8002
+      - RPC_PORT=8901
+    command: /app/scripts/start-validator.sh validator-1
+    depends_on:
+      bootstrap:
+        condition: service_healthy
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - solana-cluster
+
+  validator-2:
+    build:
+      context: ..
+      dockerfile: docker/Dockerfile.production
+    image: solana-validator:latest
+    container_name: solana-validator-2
+    hostname: validator-2
+    volumes:
+      - validator-2-ledger:/app/data/validator/validator-2
+      - validator-keys:/app/keys
+      - validator-2-logs:/app/logs
+      - ../configs:/app/configs:ro
+    ports:
+      - "${VALIDATOR_2_GOSSIP_PORT:-8003}:8003/udp"
+      - "${VALIDATOR_2_GOSSIP_PORT:-8003}:8003/tcp"
+      - "${VALIDATOR_2_RPC_PORT:-8903}:8903"
+    environment:
+      - NODE_NAME=validator-2
+      - NODE_ROLE=validator
+      - ENTRYPOINT_HOST=bootstrap
+      - ENTRYPOINT_PORT=8001
+      - RPC_BIND_ADDRESS=0.0.0.0
+      - GOSSIP_PORT=8003
+      - RPC_PORT=8903
+    command: /app/scripts/start-validator.sh validator-2
+    depends_on:
+      bootstrap:
+        condition: service_healthy
+    restart: unless-stopped
+    ulimits:
+      nofile:
+        soft: 1000000
+        hard: 1000000
+      memlock:
+        soft: -1
+        hard: -1
+    networks:
+      - solana-cluster
+
+volumes:
+  bootstrap-ledger:
+  validator-1-ledger:
+  validator-2-ledger:
+  validator-keys:
+  bootstrap-logs:
+  validator-1-logs:
+  validator-2-logs:
+
+networks:
+  solana-cluster:
+    driver: bridge

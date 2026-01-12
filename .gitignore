@@ -1,70 +1,49 @@
+# Keys and secrets
+keys/**/*.json
+*.json
+!package.json
+!package-lock.json
+!kubernetes/*.json
+
 # Logs
-logs/
+logs/**/*.log
+logs/**/*.log.*
 *.log
 
-# Backups
-backups/
-solana-backups/
-*.tar.gz
-*.backup
+# Data directories
+data/**/*
+!data/.gitkeep
 
-# Ledger data
-solana-ledger/
-solana-local-ledger/
+# PID files
+*.pid
 
-# Configuration (sensitive)
-.config/solana/
-solana-security-config/
-
-# System files
-.DS_Store
-*.swp
-*.swo
-*~
+# Build artifacts
+bin/*
+!bin/.gitkeep
 
 # Temporary files
-tmp/
-temp/
 *.tmp
+*.swp
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
 
 # IDE files
 .vscode/
 .idea/
 *.code-workspace
 
-# Python (if using Python scripts)
-__pycache__/
-*.py[cod]
-*$py.class
-*.so
-.Python
-venv/
-env/
+# Source code (if building from source)
+.agave-src/
 
-# Node (if using Node scripts)
-node_modules/
-npm-debug.log
-yarn-error.log
+# Node-specific configs (may contain sensitive info)
+configs/*.conf
+!configs/cluster.conf
+!configs/node.conf.template
+!configs/logrotate.conf
 
-# Rust
-target/
-Cargo.lock
-
-# Solana
-*.so
-*.dylib
-
-# Environment files (if any)
+# Environment files
 .env
 .env.local
-
-# Azure credentials (never commit!)
-.azure/
-azure-credentials.json
-
-# SSH keys (never commit!)
-*.pem
-*.key
-id_rsa*
-id_ed25519*
-

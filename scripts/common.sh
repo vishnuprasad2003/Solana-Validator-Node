@@ -1,506 +1,363 @@
-#!/usr/bin/env bash
+#!/bin/bash
 #
-# Common Library for Solana Validator Node Scripts
-# Provides portable, cross-platform functions for all scripts
-# Follows POSIX-compliant bash best practices
+# Common functions and utilities for Solana validator scripts
 #
 
-# Prevent multiple sourcing
-if [ -n "${COMMON_LIB_LOADED:-}" ]; then
-    return 0
+set -euo pipefail
+
+# Get the script directory and workspace root
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+# Support both local and containerized environments
+if [[ -d "/app" ]] && [[ -f "/app/scripts/common.sh" ]]; then
+    WORKSPACE_ROOT="/app"
+else
+    WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 fi
-export COMMON_LIB_LOADED=1
 
-# ============================================================================
-# SHELL DETECTION AND COMPATIBILITY
-# ============================================================================
-
-# Detect shell and ensure bash compatibility
-detect_shell() {
-    local shell_name
-    shell_name="${SHELL##*/}"
-    echo "$shell_name"
-}
-
-# Ensure we're using bash
-if [ -z "${BASH_VERSION:-}" ]; then
-    echo "Error: This script requires bash" >&2
+# Source cluster configuration
+if [[ -f "${WORKSPACE_ROOT}/configs/cluster.conf" ]]; then
+    # Source with error handling for unset variables
+    set +u
+    source "${WORKSPACE_ROOT}/configs/cluster.conf"
+    set -u
+else
+    echo "ERROR: cluster.conf not found at ${WORKSPACE_ROOT}/configs/cluster.conf"
     exit 1
 fi
 
-# ============================================================================
-# OS DETECTION
-# ============================================================================
+# Set WORKSPACE_ROOT if not already set from config
+WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 
-detect_os() {
-    local os_id os_version os_codename
-    os_id=""
-    os_version=""
-    os_codename=""
-    
-    # Try /etc/os-release first (most modern)
-    if [ -f /etc/os-release ]; then
-        # shellcheck source=/dev/null
-        . /etc/os-release
-        os_id="${ID:-}"
-        os_version="${VERSION_ID:-}"
-        os_codename="${VERSION_CODENAME:-}"
-        
-        # Handle Ubuntu/Debian codename
-        if [ -z "$os_codename" ] && [ -n "${UBUNTU_CODENAME:-}" ]; then
-            os_codename="$UBUNTU_CODENAME"
-        fi
-    # Fallback to older methods
-    elif [ -f /etc/redhat-release ]; then
-        if grep -qi "centos" /etc/redhat-release; then
-            os_id="centos"
-            os_version=$(grep -oE '[0-9]+\.[0-9]+' /etc/redhat-release | head -1)
-        elif grep -qi "red hat" /etc/redhat-release; then
-            os_id="rhel"
-            os_version=$(grep -oE '[0-9]+\.[0-9]+' /etc/redhat-release | head -1)
-        fi
-    elif [ -f /etc/debian_version ]; then
-        os_id="debian"
-        os_version=$(cat /etc/debian_version)
-    elif [ -f /etc/arch-release ]; then
-        os_id="arch"
-    elif [ -f /etc/SuSE-release ]; then
-        os_id="sles"
-        os_version=$(grep VERSION /etc/SuSE-release | awk '{print $3}')
-    fi
-    
-    # Normalize OS ID
-    case "$os_id" in
-        ubuntu|debian)
-            echo "debian"
-            ;;
-        rhel|centos|rocky|almalinux|fedora|amazon)
-            echo "rhel"
-            ;;
-        arch|manjaro)
-            echo "arch"
-            ;;
-        sles|opensuse*)
-            echo "sles"
-            ;;
-        *)
-            echo "unknown"
-            ;;
-    esac
+# Color output
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Logging functions
+log_info() {
+    echo -e "${BLUE}[INFO]${NC} $*" >&2
 }
 
-# Get OS family
-OS_FAMILY=$(detect_os)
-export OS_FAMILY
-
-# Get detailed OS info
-get_os_info() {
-    local os_id os_version os_codename
-    os_id=""
-    os_version=""
-    os_codename=""
-    
-    if [ -f /etc/os-release ]; then
-        # shellcheck source=/dev/null
-        . /etc/os-release
-        os_id="${ID:-}"
-        os_version="${VERSION_ID:-}"
-        os_codename="${VERSION_CODENAME:-${UBUNTU_CODENAME:-}}"
-    fi
-    
-    echo "$os_id|$os_version|$os_codename"
+log_success() {
+    echo -e "${GREEN}[SUCCESS]${NC} $*" >&2
 }
 
-# ============================================================================
-# PACKAGE MANAGER DETECTION
-# ============================================================================
-
-detect_package_manager() {
-    local pm=""
-    
-    case "$OS_FAMILY" in
-        debian)
-            if command -v apt-get >/dev/null 2>&1; then
-                pm="apt"
-            elif command -v apt >/dev/null 2>&1; then
-                pm="apt"
-            fi
-            ;;
-        rhel)
-            if command -v dnf >/dev/null 2>&1; then
-                pm="dnf"
-            elif command -v yum >/dev/null 2>&1; then
-                pm="yum"
-            fi
-            ;;
-        arch)
-            if command -v pacman >/dev/null 2>&1; then
-                pm="pacman"
-            fi
-            ;;
-        sles)
-            if command -v zypper >/dev/null 2>&1; then
-                pm="zypper"
-            fi
-            ;;
-    esac
-    
-    echo "${pm:-unknown}"
+log_warn() {
+    echo -e "${YELLOW}[WARN]${NC} $*" >&2
 }
 
-# Get package manager
-PACKAGE_MANAGER=$(detect_package_manager)
-export PACKAGE_MANAGER
-
-# ============================================================================
-# ARCHITECTURE DETECTION
-# ============================================================================
-
-detect_architecture() {
-    local arch
-    arch=$(uname -m)
-    
-    case "$arch" in
-        x86_64|amd64)
-            echo "x86_64-unknown-linux-gnu"
-            ;;
-        aarch64|arm64)
-            echo "aarch64-unknown-linux-gnu"
-            ;;
-        armv7l|armv6l)
-            echo "arm-unknown-linux-gnueabihf"
-            ;;
-        *)
-            echo "unknown"
-            ;;
-    esac
+log_error() {
+    echo -e "${RED}[ERROR]${NC} $*" >&2
 }
-
-# Get architecture
-ARCHITECTURE=$(detect_architecture)
-export ARCHITECTURE
-
-# ============================================================================
-# SERVICE MANAGER DETECTION
-# ============================================================================
-
-detect_service_manager() {
-    if systemctl --version >/dev/null 2>&1; then
-        echo "systemd"
-    elif [ -d /etc/init.d ]; then
-        echo "sysvinit"
-    elif command -v service >/dev/null 2>&1; then
-        echo "service"
-    else
-        echo "unknown"
-    fi
-}
-
-# Get service manager
-SERVICE_MANAGER=$(detect_service_manager)
-export SERVICE_MANAGER
-
-# ============================================================================
-# FIREWALL DETECTION
-# ============================================================================
-
-detect_firewall() {
-    if command -v ufw >/dev/null 2>&1; then
-        echo "ufw"
-    elif command -v firewall-cmd >/dev/null 2>&1; then
-        echo "firewalld"
-    elif command -v iptables >/dev/null 2>&1; then
-        echo "iptables"
-    else
-        echo "none"
-    fi
-}
-
-# Get firewall
-FIREWALL=$(detect_firewall)
-export FIREWALL
-
-# ============================================================================
-# PACKAGE MANAGEMENT FUNCTIONS
-# ============================================================================
-
-# Install packages using detected package manager
-install_packages() {
-    local packages=("$@")
-    local failed=0
-    
-    case "$PACKAGE_MANAGER" in
-        apt)
-            sudo apt-get update -qq || true
-            sudo apt-get install -y "${packages[@]}" || failed=1
-            ;;
-        dnf)
-            sudo dnf install -y "${packages[@]}" || failed=1
-            ;;
-        yum)
-            sudo yum install -y "${packages[@]}" || failed=1
-            ;;
-        pacman)
-            sudo pacman -S --noconfirm "${packages[@]}" || failed=1
-            ;;
-        zypper)
-            sudo zypper install -y "${packages[@]}" || failed=1
-            ;;
-        *)
-            echo "Error: Unsupported package manager: $PACKAGE_MANAGER" >&2
-            return 1
-            ;;
-    esac
-    
-    return $failed
-}
-
-# Check if package is installed
-is_package_installed() {
-    local package="$1"
-    
-    case "$PACKAGE_MANAGER" in
-        apt)
-            dpkg -l | grep -q "^ii  $package " 2>/dev/null
-            ;;
-        dnf|yum)
-            rpm -q "$package" >/dev/null 2>&1
-            ;;
-        pacman)
-            pacman -Q "$package" >/dev/null 2>&1
-            ;;
-        zypper)
-            rpm -q "$package" >/dev/null 2>&1
-            ;;
-        *)
-            return 1
-            ;;
-    esac
-}
-
-# Update package lists
-update_package_lists() {
-    case "$PACKAGE_MANAGER" in
-        apt)
-            sudo apt-get update -qq || true
-            ;;
-        dnf)
-            sudo dnf check-update -q || true
-            ;;
-        yum)
-            sudo yum check-update -q || true
-            ;;
-        pacman)
-            sudo pacman -Sy --noconfirm || true
-            ;;
-        zypper)
-            sudo zypper refresh -q || true
-            ;;
-    esac
-}
-
-# ============================================================================
-# COMMAND DETECTION
-# ============================================================================
 
 # Check if command exists
 command_exists() {
     command -v "$1" >/dev/null 2>&1
 }
 
-# Require command (exit if not found)
-require_command() {
-    local cmd="$1"
-    local error_msg="${2:-Command $cmd is required but not found}"
-    
-    if ! command_exists "$cmd"; then
-        echo "Error: $error_msg" >&2
-        exit 1
-    fi
+# Check if port is available
+port_available() {
+    local port=$1
+    ! (ss -tuln | grep -q ":${port} ")
 }
 
-# ============================================================================
-# PATH HANDLING
-# ============================================================================
-
-# Safely add to PATH (avoid duplicates)
-add_to_path() {
-    local new_path="$1"
-    local path_var="${2:-PATH}"
+# Check file descriptor limits
+check_file_descriptor_limits() {
+    local required_limit=${1:-1000000}
+    local current_soft
+    local current_hard
     
-    if [ -z "${!path_var:-}" ]; then
-        export "$path_var=$new_path"
-    elif [[ ":${!path_var}:" != *":${new_path}:"* ]]; then
-        export "$path_var=${new_path}:${!path_var}"
+    current_soft=$(ulimit -Sn 2>/dev/null || echo "0")
+    current_hard=$(ulimit -Hn 2>/dev/null || echo "0")
+    
+    if [[ -z "$current_soft" ]] || [[ "$current_soft" == "unlimited" ]]; then
+        current_soft=999999999
     fi
-}
-
-# ============================================================================
-# NETWORK FUNCTIONS
-# ============================================================================
-
-# Detect public IP address
-detect_public_ip() {
-    local ip=""
+    if [[ -z "$current_hard" ]] || [[ "$current_hard" == "unlimited" ]]; then
+        current_hard=999999999
+    fi
     
-    # Try multiple services
-    for service in "ifconfig.me" "ipinfo.io/ip" "icanhazip.com" "api.ipify.org"; do
-        ip=$(curl -s --max-time 5 "https://$service" 2>/dev/null || curl -s --max-time 5 "http://$service" 2>/dev/null)
-        if [ -n "$ip" ] && [[ "$ip" =~ ^[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}$ ]] || [[ "$ip" == *:* ]]; then
-            echo "$ip"
-            return 0
+    # Check if we can set limits via prlimit or systemd-run (even if session limits are low)
+    if command_exists prlimit || command_exists systemd-run; then
+        if [[ $current_hard -lt $required_limit ]]; then
+            log_warn "File descriptor limit is low, but will use prlimit/systemd-run to set process limits"
+            log_info "  Current soft limit: $current_soft"
+            log_info "  Current hard limit: $current_hard"
+            log_info "  Required: $required_limit"
+            log_info "  Will set limit for validator process using prlimit/systemd-run"
+            return 0  # Allow starting since we can set limits for the process
+        elif [[ $current_soft -lt $required_limit ]]; then
+            log_info "File descriptor soft limit is low, will use prlimit/systemd-run to set process limits"
+            return 0  # Allow starting since we can set limits for the process
         fi
-    done
-    
-    return 1
-}
-
-# Format IP for URL (wrap IPv6 in brackets)
-format_ip_for_url() {
-    local ip="$1"
-    if [[ "$ip" == *:* ]]; then
-        echo "[$ip]"
-    else
-        echo "$ip"
-    fi
-}
-
-# ============================================================================
-# DIRECTORY FUNCTIONS
-# ============================================================================
-
-# Create directory with proper permissions
-safe_mkdir() {
-    local dir="$1"
-    local perms="${2:-0755}"
-    
-    if [ ! -d "$dir" ]; then
-        mkdir -p "$dir"
-        chmod "$perms" "$dir" 2>/dev/null || true
-    fi
-}
-
-# ============================================================================
-# FILE OPERATIONS
-# ============================================================================
-
-# Safely source a file
-safe_source() {
-    local file="$1"
-    if [ -f "$file" ] && [ -r "$file" ]; then
-        # shellcheck source=/dev/null
-        . "$file"
         return 0
     fi
+    
+    # No prlimit/systemd-run available, check session limits
+    if [[ $current_hard -lt $required_limit ]]; then
+        log_warn "File descriptor limit is too low"
+        log_info "  Current soft limit: $current_soft"
+        log_info "  Current hard limit: $current_hard"
+        log_info "  Required: $required_limit"
+        log_info ""
+        log_info "To fix this, run:"
+        log_info "  sudo ./scripts/configure-limits.sh"
+        log_info "  Then log out and log back in"
+        log_info "  Or install 'util-linux' package for prlimit support"
+        return 1
+    elif [[ $current_soft -lt $required_limit ]]; then
+        log_warn "File descriptor soft limit is too low"
+        log_info "  Current soft limit: $current_soft"
+        log_info "  Current hard limit: $current_hard"
+        log_info "  Required: $required_limit"
+        log_info ""
+        log_info "The hard limit is sufficient, but soft limit needs to be increased."
+        log_info "Run: ulimit -n $required_limit"
+        log_info "Or configure permanently: sudo ./scripts/configure-limits.sh"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Check if directory exists and is writable
+check_directory() {
+    local dir=$1
+    if [[ ! -d "$dir" ]]; then
+        mkdir -p "$dir" || {
+            log_error "Failed to create directory: $dir"
+            return 1
+        }
+    fi
+    if [[ ! -w "$dir" ]]; then
+        log_error "Directory is not writable: $dir"
+        return 1
+    fi
+    return 0
+}
+
+# Generate keypair if it doesn't exist
+generate_keypair() {
+    local key_path=$1
+    local key_type=${2:-"identity"}
+    
+    if [[ -f "$key_path" ]]; then
+        log_warn "Keypair already exists: $key_path"
+        return 0
+    fi
+    
+    log_info "Generating ${key_type} keypair: $key_path"
+    
+    # Ensure parent directory exists
+    mkdir -p "$(dirname "$key_path")"
+    
+    # Generate keypair using solana-keygen
+    if ! command_exists solana-keygen; then
+        log_error "solana-keygen not found. Please install Solana CLI tools."
+        return 1
+    fi
+    
+    solana-keygen new --no-bip39-passphrase --outfile "$key_path" --force >/dev/null 2>&1 || {
+        log_error "Failed to generate keypair: $key_path"
+        return 1
+    }
+    
+    log_success "Generated keypair: $key_path"
+    return 0
+}
+
+# Get public key from keypair file
+get_pubkey() {
+    local key_path=$1
+    if [[ ! -f "$key_path" ]]; then
+        log_error "Keypair file not found: $key_path"
+        return 1
+    fi
+    
+    # Change to the key file's directory to avoid issues with paths containing spaces
+    local key_dir
+    local key_file
+    key_dir=$(dirname "$key_path")
+    key_file=$(basename "$key_path")
+    
+    # Use absolute path resolution to handle spaces
+    (cd "$key_dir" && solana-keygen pubkey "$key_file" 2>/dev/null) || {
+        log_error "Failed to extract public key from: $key_path"
+        return 1
+    }
+}
+
+# Validate keypair file
+validate_keypair() {
+    local key_path=$1
+    if [[ ! -f "$key_path" ]]; then
+        log_error "Keypair file not found: $key_path"
+        return 1
+    fi
+    
+    # Try to extract public key as validation
+    if ! get_pubkey "$key_path" >/dev/null 2>&1; then
+        log_error "Invalid keypair file: $key_path"
+        return 1
+    fi
+    
+    return 0
+}
+
+# Setup log rotation
+setup_log_rotation() {
+    local log_file=$1
+    local max_size_mb=${LOG_FILE_MAX_SIZE_MB:-100}
+    local max_count=${LOG_FILE_MAX_COUNT:-10}
+    
+    # Ensure log directory exists
+    mkdir -p "$(dirname "$log_file")"
+    
+    # Create logrotate config if it doesn't exist
+    local logrotate_config="${WORKSPACE_ROOT}/configs/logrotate.conf"
+    if [[ ! -f "$logrotate_config" ]]; then
+        cat > "$logrotate_config" <<EOF
+${log_file} {
+    daily
+    rotate ${max_count}
+    compress
+    delaycompress
+    missingok
+    notifempty
+    create 0644 $(whoami) $(whoami)
+    maxsize ${max_size_mb}M
+    copytruncate
+}
+EOF
+        log_info "Created logrotate configuration: $logrotate_config"
+    fi
+}
+
+# Check if Agave validator is installed
+check_agave_installed() {
+    # Check for agave-validator first (new name)
+    if command_exists agave-validator; then
+        local version
+        version=$(agave-validator --version 2>/dev/null | head -n1 || echo "unknown")
+        log_info "Found Agave validator: $version"
+        return 0
+    fi
+    
+    # Check for solana-validator (legacy/backward compatibility)
+    if command_exists solana-validator; then
+        local version
+        version=$(solana-validator --version 2>/dev/null | head -n1 || echo "unknown")
+        log_info "Found Solana validator (legacy): $version"
+        return 0
+    fi
+    
+    # Check in install directory for agave-validator
+    if [[ -f "${AGAVE_INSTALL_DIR}/agave-validator" ]]; then
+        log_info "Found Agave validator in ${AGAVE_INSTALL_DIR}"
+        return 0
+    fi
+    
+    # Check in install directory for solana-validator
+    if [[ -f "${AGAVE_INSTALL_DIR}/solana-validator" ]]; then
+        log_info "Found Solana validator in ${AGAVE_INSTALL_DIR}"
+        return 0
+    fi
+    
+    # Check default Solana installation location
+    local solana_bin_dir="$HOME/.local/share/solana/install/active_release/bin"
+    if [[ -f "${solana_bin_dir}/agave-validator" ]]; then
+        log_info "Found Agave validator in ${solana_bin_dir}"
+        return 0
+    fi
+    
+    if [[ -f "${solana_bin_dir}/solana-validator" ]]; then
+        log_info "Found Solana validator in ${solana_bin_dir}"
+        return 0
+    fi
+    
     return 1
 }
 
-# ============================================================================
-# LOGGING FUNCTIONS (console output only)
-# ============================================================================
-
-log_info() {
-    echo "[INFO] $*"
-}
-
-log_success() {
-    echo "[SUCCESS] $*"
-}
-
-log_warning() {
-    echo "[WARNING] $*" >&2
-}
-
-log_error() {
-    echo "[ERROR] $*" >&2
-}
-
-# ============================================================================
-# ERROR HANDLING
-# ============================================================================
-
-# Trap errors
-set_error_trap() {
-    set -eE
-    trap 'error_handler $? $LINENO' ERR
-}
-
-error_handler() {
-    local exit_code=$1
-    local line_no=$2
-    log_error "Error occurred at line $line_no with exit code $exit_code"
-    exit $exit_code
-}
-
-# ============================================================================
-# SUDO CHECK
-# ============================================================================
-
-# Check if sudo is available
-check_sudo() {
-    if ! command_exists sudo; then
-        log_error "sudo is required but not found. Please install sudo or run as root."
-        exit 1
+# Get Agave validator binary path
+get_agave_binary() {
+    # Try agave-validator first (preferred)
+    if command_exists agave-validator; then
+        echo "agave-validator"
+        return 0
     fi
     
-    # Test sudo access
-    if ! sudo -n true 2>/dev/null; then
-        log_info "This script requires sudo privileges. You may be prompted for your password."
+    # Try solana-validator (legacy)
+    if command_exists solana-validator; then
+        echo "solana-validator"
+        return 0
     fi
-}
-
-# ============================================================================
-# ROOT CHECK
-# ============================================================================
-
-# Check if running as root (and exit if so, unless allowed)
-check_not_root() {
-    if [ "$EUID" -eq 0 ]; then
-        log_error "This script should not be run as root. Please run as a regular user with sudo privileges."
-        exit 1
+    
+    # Check install directory
+    if [[ -f "${AGAVE_INSTALL_DIR}/agave-validator" ]]; then
+        echo "${AGAVE_INSTALL_DIR}/agave-validator"
+        return 0
     fi
-}
-
-# ============================================================================
-# ENVIRONMENT SETUP
-# ============================================================================
-
-# Setup common environment variables
-setup_environment() {
-    # Ensure common directories exist
-    safe_mkdir "$HOME/.local/share"
-    safe_mkdir "$HOME/.config"
     
-    # Add common paths
-    add_to_path "$HOME/.local/bin"
-    add_to_path "$HOME/.cargo/bin"
-    add_to_path "$HOME/.local/share/solana/install/active_release/bin"
-}
-
-# ============================================================================
-# INITIALIZATION
-# ============================================================================
-
-# Initialize common library
-init_common() {
-    # Setup environment
-    setup_environment
+    if [[ -f "${AGAVE_INSTALL_DIR}/solana-validator" ]]; then
+        echo "${AGAVE_INSTALL_DIR}/solana-validator"
+        return 0
+    fi
     
-    # Export detected values
-    export OS_FAMILY
-    export PACKAGE_MANAGER
-    export ARCHITECTURE
-    export SERVICE_MANAGER
-    export FIREWALL
+    # Check default Solana installation location
+    local solana_bin_dir="$HOME/.local/share/solana/install/active_release/bin"
+    if [[ -f "${solana_bin_dir}/agave-validator" ]]; then
+        echo "${solana_bin_dir}/agave-validator"
+        return 0
+    fi
+    
+    if [[ -f "${solana_bin_dir}/solana-validator" ]]; then
+        echo "${solana_bin_dir}/solana-validator"
+        return 0
+    fi
+    
+    log_error "Agave validator binary not found"
+    log_info "Please install it using: ./scripts/install.sh"
+    log_info "Or build from source: INSTALL_METHOD=cargo ./scripts/install.sh"
+    return 1
 }
 
-# Auto-initialize if not sourced from another script
-if [ "${BASH_SOURCE[0]}" = "${0}" ]; then
-    init_common
-    echo "OS Family: $OS_FAMILY"
-    echo "Package Manager: $PACKAGE_MANAGER"
-    echo "Architecture: $ARCHITECTURE"
-    echo "Service Manager: $SERVICE_MANAGER"
-    echo "Firewall: $FIREWALL"
-fi
+# Wait for validator to be ready
+wait_for_validator() {
+    local rpc_url=$1
+    local max_attempts=${2:-30}
+    local attempt=0
+    
+    log_info "Waiting for validator to be ready at $rpc_url..."
+    
+    while [[ $attempt -lt $max_attempts ]]; do
+        if curl -s -X POST "$rpc_url" \
+            -H "Content-Type: application/json" \
+            -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' \
+            >/dev/null 2>&1; then
+            log_success "Validator is ready!"
+            return 0
+        fi
+        
+        attempt=$((attempt + 1))
+        sleep 2
+    done
+    
+    log_error "Validator failed to become ready after $max_attempts attempts"
+    return 1
+}
 
+# Export environment variables for validator
+export_validator_env() {
+    export RUST_LOG="${LOG_LEVEL:-info}"
+    export RUST_BACKTRACE=1
+}
+
+# Cleanup function for traps
+cleanup() {
+    log_info "Cleaning up..."
+    # Add any cleanup logic here
+}
+
+trap cleanup EXIT INT TERM

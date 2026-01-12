@@ -1,0 +1,23 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: solana-config
+  namespace: solana-cluster
+data:
+  cluster.conf: |
+    # Cluster configuration
+    CLUSTER_NAME="private-testnet"
+    CLUSTER_TYPE="development"
+    GOSSIP_PORT=8001
+    RPC_PORT=8899
+    RPC_WEBSOCKET_PORT=8900
+    METRICS_PORT=9090
+    DYNAMIC_PORT_RANGE_START=8000
+    DYNAMIC_PORT_RANGE_END=8025
+    BOOTSTRAP_VALIDATOR_IP="bootstrap"
+    BOOTSTRAP_VALIDATOR_GOSSIP_PORT=8001
+    GENESIS_LAMPORTS=1000000000000000
+    FAUCET_LAMPORTS=1000000000000000
+    LOG_LEVEL="info"
+    ENABLE_METRICS=true
+    METRICS_HOST="0.0.0.0"

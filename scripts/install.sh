@@ -1,111 +1,204 @@
 #!/bin/bash
+#
+# Install/Upgrade Agave Validator and Solana CLI Tools
+# This script installs the latest stable version of Agave validator
+#
+
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
-[ -f "$REPO_ROOT/configs/config.env" ] && source "$REPO_ROOT/configs/config.env"
+# Installation options
+INSTALL_METHOD="${INSTALL_METHOD:-sh}"  # Options: sh (install.sh), cargo
+AGAVE_VERSION="${AGAVE_VERSION:-latest}"
+INSTALL_DIR="${AGAVE_INSTALL_DIR:-${WORKSPACE_ROOT}/bin}"
 
-[ "$EUID" -eq 0 ] && { echo "Error: Do not run as root"; exit 1; }
-command -v sudo > /dev/null || { echo "Error: sudo required"; exit 1; }
+log_info "Installing Agave Validator and Solana CLI Tools"
+log_info "Install method: $INSTALL_METHOD"
+log_info "Version: $AGAVE_VERSION"
+log_info "Install directory: $INSTALL_DIR"
 
-source "$SCRIPT_DIR/common.sh" || { echo "Error: Failed to load common library"; exit 1; }
-init_common
+# Create install directory
+check_directory "$INSTALL_DIR"
 
-echo "Solana Validator Node - Installation"
-echo ""
-
-SOLANA_VERSION="${SOLANA_VERSION:-stable}"
-
-echo "[1/6] Updating packages..."
-update_package_lists
-
-echo "[2/6] Installing dependencies..."
-CORE_PACKAGES=("build-essential" "pkg-config" "libudev-dev" "libssl-dev" "curl" "git" "wget" "jq" "tmux" "ca-certificates")
-get_package_name() {
-    case "$OS_FAMILY" in
-        debian) case "$1" in build-essential) echo "build-essential" ;; pkg-config) echo "pkg-config" ;; libudev-dev) echo "libudev-dev" ;; libssl-dev) echo "libssl-dev" ;; *) echo "$1" ;; esac ;;
-        rhel) case "$1" in build-essential) echo "gcc gcc-c++ make" ;; pkg-config) echo "pkgconfig" ;; libudev-dev) echo "systemd-devel" ;; libssl-dev) echo "openssl-devel" ;; ufw) echo "firewalld" ;; *) echo "$1" ;; esac ;;
-        arch) case "$1" in build-essential) echo "base-devel" ;; pkg-config) echo "pkgconf" ;; libudev-dev) echo "systemd" ;; libssl-dev) echo "openssl" ;; *) echo "$1" ;; esac ;;
-        *) echo "$1" ;;
-    esac
+install_via_sh() {
+    log_info "Installing via official Solana install script..."
+    
+    # Download and run the official Solana install script
+    if ! command_exists sh; then
+        log_error "sh command not found"
+        return 1
+    fi
+    
+    # Use the official Solana install script
+    sh -c "$(curl -sSfL https://release.anza.xyz/stable/install)" || {
+        log_error "Failed to install Solana via install script"
+        return 1
+    }
+    
+    # Add to PATH for current session
+    export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"
+    
+    log_success "Solana CLI tools installed successfully"
+    
+    # Verify installation - check for both agave-validator and solana-validator
+    local validator_found=false
+    local validator_path=""
+    local validator_name=""
+    
+    # Check for agave-validator (preferred)
+    if command_exists agave-validator; then
+        validator_found=true
+        validator_path="agave-validator"
+        validator_name="agave-validator"
+        local version
+        version=$(agave-validator --version 2>/dev/null | head -n1 || echo "unknown")
+        log_success "Agave validator installed: $version"
+    # Check for solana-validator (legacy)
+    elif command_exists solana-validator; then
+        validator_found=true
+        validator_path="solana-validator"
+        validator_name="solana-validator"
+        local version
+        version=$(solana-validator --version 2>/dev/null | head -n1 || echo "unknown")
+        log_success "Solana validator (legacy) installed: $version"
+    # Check default installation location
+    else
+        local solana_bin_dir="$HOME/.local/share/solana/install/active_release/bin"
+        
+        if [[ -f "${solana_bin_dir}/agave-validator" ]]; then
+            validator_found=true
+            validator_path="${solana_bin_dir}/agave-validator"
+            validator_name="agave-validator"
+            log_info "Found Agave validator at: ${validator_path}"
+            # Create symlink in install directory
+            mkdir -p "$INSTALL_DIR"
+            ln -sf "${validator_path}" "${INSTALL_DIR}/agave-validator"
+            log_success "Created symlink in ${INSTALL_DIR}"
+        elif [[ -f "${solana_bin_dir}/solana-validator" ]]; then
+            validator_found=true
+            validator_path="${solana_bin_dir}/solana-validator"
+            validator_name="solana-validator"
+            log_info "Found Solana validator at: ${validator_path}"
+            # Create symlink in install directory
+            mkdir -p "$INSTALL_DIR"
+            ln -sf "${validator_path}" "${INSTALL_DIR}/solana-validator"
+            log_success "Created symlink in ${INSTALL_DIR}"
+        else
+            log_warn "Validator binary not found in standard locations"
+            log_info "The Solana installer may not include the production validator binary"
+            log_info "For production use, you may need to build from source:"
+            log_info "  INSTALL_METHOD=cargo ./scripts/install.sh"
+        fi
+    fi
+    
+    # Verify other tools
+    for tool in solana solana-keygen solana-genesis; do
+        if command_exists "$tool"; then
+            log_success "Installed: $tool"
+        else
+            log_warn "Tool not found in PATH: $tool"
+        fi
+    done
 }
 
-MISSING=()
-for pkg in "${CORE_PACKAGES[@]}"; do
-    distro_pkg=$(get_package_name "$pkg")
-    for dp in $distro_pkg; do
-        is_package_installed "$dp" || MISSING+=("$dp")
-    done
-done
+install_via_cargo() {
+    log_info "Installing via Cargo (Rust)..."
+    
+    if ! command_exists cargo; then
+        log_error "Cargo not found. Please install Rust first: https://rustup.rs/"
+        return 1
+    fi
+    
+    log_info "Building Agave from source (this may take a while)..."
+    
+    # Clone Agave repository if needed
+    local agave_repo_dir="${WORKSPACE_ROOT}/.agave-src"
+    if [[ ! -d "$agave_repo_dir" ]]; then
+        log_info "Cloning Agave repository..."
+        git clone https://github.com/anza-xyz/agave.git "$agave_repo_dir" || {
+            log_error "Failed to clone Agave repository"
+            return 1
+        }
+    else
+        log_info "Updating Agave repository..."
+        cd "$agave_repo_dir"
+        git pull || log_warn "Failed to update repository"
+    fi
+    
+    cd "$agave_repo_dir"
+    
+    # Build validator (Agave uses agave-validator as the binary name)
+    log_info "Building agave-validator..."
+    
+    # Try building agave-validator first (new name)
+    if cargo build --release --bin agave-validator 2>/dev/null; then
+        # Copy binary to install directory
+        mkdir -p "$INSTALL_DIR"
+        cp target/release/agave-validator "${INSTALL_DIR}/" || {
+            log_error "Failed to copy validator binary"
+            return 1
+        }
+        log_success "Agave validator built and installed to ${INSTALL_DIR}"
+    # Fallback to solana-validator (legacy)
+    elif cargo build --release --bin solana-validator 2>/dev/null; then
+        # Copy binary to install directory
+        mkdir -p "$INSTALL_DIR"
+        cp target/release/solana-validator "${INSTALL_DIR}/" || {
+            log_error "Failed to copy validator binary"
+            return 1
+        }
+        log_success "Solana validator (legacy) built and installed to ${INSTALL_DIR}"
+    else
+        log_error "Failed to build validator binary"
+        log_info "Tried both 'agave-validator' and 'solana-validator' binary names"
+        return 1
+    fi
+}
 
-[ ${#MISSING[@]} -gt 0 ] && install_packages "${MISSING[@]}" || echo "✓ All dependencies installed"
+# Main installation logic
+main() {
+    case "$INSTALL_METHOD" in
+        sh)
+            install_via_sh
+            ;;
+        cargo)
+            install_via_cargo
+            ;;
+        *)
+            log_error "Unknown install method: $INSTALL_METHOD"
+            log_info "Supported methods: sh, cargo"
+            exit 1
+            ;;
+    esac
+    
+    # Verify installation
+    if check_agave_installed; then
+        log_success "Installation completed successfully!"
+        log_info "Validator binary location:"
+        get_agave_binary
+        log_info ""
+        log_info "Note: If the validator binary is not in your PATH,"
+        log_info "the scripts will automatically use the full path."
+    else
+        log_warn "Installation completed but production validator binary not found"
+        log_info ""
+        log_info "The standard Solana installer includes CLI tools but may not include"
+        log_info "the production validator binary (agave-validator)."
+        log_info ""
+        log_info "To install the production validator, you have two options:"
+        log_info ""
+        log_info "1. Build from source (recommended for production):"
+        log_info "   INSTALL_METHOD=cargo ./scripts/install.sh"
+        log_info ""
+        log_info "2. For local testing, you can use solana-test-validator, but"
+        log_info "   it's not suitable for production multi-node clusters."
+        log_info ""
+        log_info "The scripts will work once you build the validator from source."
+        exit 1
+    fi
+}
 
-echo "[3/6] Installing Rust..."
-if command_exists rustc; then
-    echo "✓ Rust already installed: $(rustc --version 2>/dev/null | head -1)"
-else
-    curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y || { echo "✗ Rust installation failed"; exit 1; }
-    [ -f "$HOME/.cargo/env" ] && source "$HOME/.cargo/env"
-    add_to_path "$HOME/.cargo/bin"
-    echo "✓ Rust installed"
-fi
-
-echo "[4/6] Installing Solana CLI ($SOLANA_VERSION)..."
-if [ "$SOLANA_VERSION" = "stable" ]; then
-    INSTALL_URLS=("https://release.anza.xyz/stable/install" "https://release.solana.com/stable/install")
-elif [ "$SOLANA_VERSION" = "beta" ]; then
-    INSTALL_URLS=("https://release.anza.xyz/beta/install" "https://release.solana.com/beta/install")
-else
-    INSTALL_URLS=("https://release.anza.xyz/$SOLANA_VERSION/install" "https://release.solana.com/$SOLANA_VERSION/install")
-fi
-
-INSTALL_SUCCESS=false
-for URL in "${INSTALL_URLS[@]}"; do
-    sh -c "$(curl -sSfL "$URL")" 2>/dev/null && INSTALL_SUCCESS=true && break
-done
-
-if [ "$INSTALL_SUCCESS" = false ]; then
-    INSTALL_SCRIPT="/tmp/solana-install.sh"
-    for URL in "${INSTALL_URLS[@]}"; do
-        curl -sSfL "$URL" -o "$INSTALL_SCRIPT" 2>/dev/null || curl -k -sSfL "$URL" -o "$INSTALL_SCRIPT" 2>/dev/null
-        [ -f "$INSTALL_SCRIPT" ] && chmod +x "$INSTALL_SCRIPT" && sh "$INSTALL_SCRIPT" && INSTALL_SUCCESS=true && rm -f "$INSTALL_SCRIPT" && break
-    done
-fi
-
-[ "$INSTALL_SUCCESS" = false ] && { echo "✗ Solana installation failed"; exit 1; }
-
-add_to_path "$HOME/.local/share/solana/install/active_release/bin"
-command_exists solana || { echo "✗ Solana CLI not found after installation"; exit 1; }
-echo "✓ Solana installed: $(solana --version 2>/dev/null | head -1)"
-
-echo "[5/6] Installing Anchor..."
-if command_exists anchor; then
-    echo "✓ Anchor already installed"
-else
-    command_exists cargo || { echo "⚠ Cargo not found, skipping Anchor"; }
-    cargo install --git https://github.com/coral-xyz/anchor avm --locked --force > /dev/null 2>&1 && \
-        command_exists avm && avm install latest > /dev/null 2>&1 && avm use latest > /dev/null 2>&1 && \
-        echo "✓ Anchor installed" || echo "⚠ Anchor installation failed (non-critical)"
-fi
-
-echo "[6/6] Configuring shell profile..."
-SHELL_PROFILE=""
-[ -f "$HOME/.bashrc" ] && SHELL_PROFILE="$HOME/.bashrc"
-[ -f "$HOME/.bash_profile" ] && [ -z "$SHELL_PROFILE" ] && SHELL_PROFILE="$HOME/.bash_profile"
-[ -f "$HOME/.zshrc" ] && [ -z "$SHELL_PROFILE" ] && SHELL_PROFILE="$HOME/.zshrc"
-
-if [ -n "$SHELL_PROFILE" ]; then
-    grep -q "export PATH.*solana" "$SHELL_PROFILE" 2>/dev/null || echo 'export PATH="$HOME/.local/share/solana/install/active_release/bin:$PATH"' >> "$SHELL_PROFILE"
-    grep -q "export PATH.*cargo" "$SHELL_PROFILE" 2>/dev/null || echo 'export PATH="$HOME/.cargo/bin:$PATH"' >> "$SHELL_PROFILE"
-    echo "✓ Shell profile configured: $SHELL_PROFILE"
-fi
-
-mkdir -p "${PROGRAMS_DIR:-$HOME/.local/share/solana-programs}"
-
-echo ""
-echo "Installation Complete!"
-echo "  Rust: $(rustc --version 2>/dev/null | head -1 || echo 'Not in PATH')"
-echo "  Solana: $(solana --version 2>/dev/null | head -1 || echo 'Not in PATH')"
-echo "  Anchor: $(anchor --version 2>/dev/null | head -1 || echo 'Not installed')"
-echo ""
-echo "Next: source $SHELL_PROFILE && ./scripts/setup-cluster.sh"
+main "$@"

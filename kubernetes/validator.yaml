@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: solana-validator
+  namespace: solana-cluster
+spec:
+  serviceName: solana-validator
+  replicas: 2  # Adjust based on your needs
+  selector:
+    matchLabels:
+      app: solana-validator
+  template:
+    metadata:
+      labels:
+        app: solana-validator
+        role: validator
+    spec:
+      securityContext:
+        fsGroup: 1000
+      containers:
+      - name: validator
+        image: solana-validator:latest  # Update with your registry: <registry>/solana-validator:latest
+        imagePullPolicy: IfNotPresent
+        command: ["/app/scripts/start-validator.sh"]
+        args: ["$(NODE_NAME)"]
+        envFrom:
+        - configMapRef:
+            name: solana-config
+        env:
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NODE_ROLE
+          value: "validator"
+        - name: ENTRYPOINT_HOST
+          value: "solana-bootstrap"
+        - name: ENTRYPOINT_PORT
+          value: "8001"
+        - name: RPC_BIND_ADDRESS
+          value: "0.0.0.0"
+        - name: RUST_LOG
+          value: "info"
+        ports:
+        - name: gossip
+          containerPort: 8002
+          protocol: UDP
+        - name: gossip-tcp
+          containerPort: 8002
+          protocol: TCP
+        - name: rpc
+          containerPort: 8901
+        - name: metrics
+          containerPort: 9091
+        volumeMounts:
+        - name: ledger
+          mountPath: /app/data/validator
+        - name: keys
+          mountPath: /app/keys
+        - name: logs
+          mountPath: /app/logs
+        - name: config
+          mountPath: /app/configs
+        resources:
+          requests:
+            memory: "4Gi"
+            cpu: "2"
+          limits:
+            memory: "16Gi"
+            cpu: "8"
+        securityContext:
+          capabilities:
+            add:
+            - SYS_RESOURCE
+      volumes:
+      - name: config
+        configMap:
+          name: solana-config
+      - name: keys
+        persistentVolumeClaim:
+          claimName: validator-keys
+      - name: logs
+        emptyDir: {}
+  volumeClaimTemplates:
+  - metadata:
+      name: ledger
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      resources:
+        requests:
+          storage: 500Gi
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: solana-validator
+  namespace: solana-cluster
+spec:
+  type: ClusterIP
+  ports:
+  - name: gossip-udp
+    port: 8002
+    protocol: UDP
+    targetPort: 8002
+  - name: gossip-tcp
+    port: 8002
+    protocol: TCP
+    targetPort: 8002
+  - name: rpc
+    port: 8901
+    targetPort: 8901
+  selector:
+    app: solana-validator

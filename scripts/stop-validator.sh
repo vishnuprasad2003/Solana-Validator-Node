@@ -1,79 +1,108 @@
 #!/bin/bash
+#
+# Stop Validator Safely
+# This script stops a running validator gracefully
+#
+
+set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-REPO_ROOT="$(cd "$SCRIPT_DIR/.." && pwd)"
+WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
+source "${SCRIPT_DIR}/common.sh"
 
-FORCE_STOP=false
-MASK_SERVICE=false
-STOP_SERVICE=false
+# Parse arguments
+NODE_NAME="${1:-bootstrap}"
+SIGNAL="${2:-TERM}"  # TERM (graceful) or KILL (force)
 
-while [[ $# -gt 0 ]]; do
-    case $1 in
-        --force) FORCE_STOP=true; shift; ;;
-        --mask) MASK_SERVICE=true; shift; ;;
-        --service) STOP_SERVICE=true; shift; ;;
-        *) echo "Usage: $0 [--force] [--mask] [--service]"; echo "  --force: Force kill validator process"; echo "  --mask: Mask systemd service (prevent auto-start)"; echo "  --service: Stop systemd service only"; exit 1; ;;
-    esac
-done
-
-# Check if validator is running
-if ! pgrep -f "solana-test-validator" > /dev/null; then
-    echo "No validator running"
-    exit 0
-fi
-
-# Handle systemd service
-if command -v systemctl > /dev/null 2>&1 && systemctl list-units --full -all 2>/dev/null | grep -q "solana-validator.service"; then
-    SERVICE_EXISTS=true
-    
-    if [ "$STOP_SERVICE" = "true" ] || [ "$FORCE_STOP" = "false" ]; then
-        echo "Stopping systemd service..."
-        sudo systemctl stop solana-validator.service 2>/dev/null && echo "✓ Service stopped" || echo "⚠ Service stop failed"
-        sleep 2
-    fi
-    
-    if [ "$MASK_SERVICE" = "true" ]; then
-        echo "Masking systemd service (prevents auto-start)..."
-        sudo systemctl mask solana-validator.service 2>/dev/null && echo "✓ Service masked" || echo "⚠ Service mask failed"
-    fi
-    
-    if [ "$FORCE_STOP" = "true" ]; then
-        echo "Disabling systemd service..."
-        sudo systemctl disable solana-validator.service 2>/dev/null || true
-    fi
+# Determine PID file
+if [[ "$NODE_NAME" == "bootstrap" ]]; then
+    PID_FILE="${WORKSPACE_ROOT}/bootstrap.pid"
+    LOG_FILE="${LOG_DIR}/bootstrap.log"
 else
-    SERVICE_EXISTS=false
+    PID_FILE="${WORKSPACE_ROOT}/${NODE_NAME}.pid"
+    LOG_FILE="${LOG_DIR}/${NODE_NAME}.log"
 fi
 
-# Stop validator processes gracefully first
-echo "Stopping validator processes..."
-for pid in $(pgrep -f "solana-test-validator"); do
-    kill -TERM "$pid" 2>/dev/null && echo "  Sent TERM to PID $pid" || true
-done
+log_info "Stopping validator: $NODE_NAME"
 
-# Wait for graceful shutdown
-sleep 3
-
-# Check if still running
-if ! pgrep -f "solana-test-validator" > /dev/null; then
-    echo "✓ Validator stopped gracefully"
+# Check if PID file exists
+if [[ ! -f "$PID_FILE" ]]; then
+    log_warn "PID file not found: $PID_FILE"
+    log_info "Validator may not be running or was started differently"
+    
+    # Try to find process by name
+    if command_exists pgrep; then
+        PIDS=$(pgrep -f "(agave-validator|solana-validator).*--identity.*${NODE_NAME}" || true)
+        if [[ -n "$PIDS" ]]; then
+            log_info "Found validator processes: $PIDS"
+            read -p "Do you want to stop these processes? (y/N): " -n 1 -r
+            echo
+            if [[ $REPLY =~ ^[Yy]$ ]]; then
+                for pid in $PIDS; do
+                    log_info "Stopping process $pid..."
+                    kill -"$SIGNAL" "$pid" 2>/dev/null || true
+                done
+            fi
+        else
+            log_info "No running validator processes found"
+        fi
+    fi
     exit 0
 fi
 
-# Force stop if requested or if graceful stop failed
-if [ "$FORCE_STOP" = "true" ]; then
-    echo "Force stopping validator processes..."
-    for pid in $(pgrep -f "solana-test-validator"); do
-        kill -9 "$pid" 2>/dev/null && echo "  Force killed PID $pid" || true
+# Read PID
+PID=$(cat "$PID_FILE")
+
+# Check if process is running
+if ! ps -p "$PID" > /dev/null 2>&1; then
+    log_warn "Process $PID is not running (stale PID file)"
+    rm -f "$PID_FILE"
+    exit 0
+fi
+
+log_info "Found validator process: $PID"
+
+# Send signal
+if [[ "$SIGNAL" == "KILL" ]]; then
+    log_warn "Force killing validator (SIGKILL)..."
+    kill -9 "$PID" 2>/dev/null || {
+        log_error "Failed to kill process $PID"
+        exit 1
+    }
+else
+    log_info "Stopping validator gracefully (SIGTERM)..."
+    kill -TERM "$PID" 2>/dev/null || {
+        log_error "Failed to send TERM signal to process $PID"
+        exit 1
+    }
+    
+    # Wait for graceful shutdown (max 30 seconds)
+    local wait_time=0
+    local max_wait=30
+    while ps -p "$PID" > /dev/null 2>&1 && [[ $wait_time -lt $max_wait ]]; do
+        sleep 1
+        wait_time=$((wait_time + 1))
+        if [[ $((wait_time % 5)) -eq 0 ]]; then
+            log_info "Waiting for validator to stop... (${wait_time}s/${max_wait}s)"
+        fi
     done
-    sleep 1
+    
+    # Check if still running
+    if ps -p "$PID" > /dev/null 2>&1; then
+        log_warn "Validator did not stop gracefully, force killing..."
+        kill -9 "$PID" 2>/dev/null || true
+    fi
 fi
 
-# Final check
-if pgrep -f "solana-test-validator" > /dev/null; then
-    echo "✗ Failed to stop validator"
+# Verify process is stopped
+sleep 1
+if ps -p "$PID" > /dev/null 2>&1; then
+    log_error "Failed to stop validator process $PID"
     exit 1
-else
-    echo "✓ Validator stopped"
-    exit 0
 fi
+
+# Remove PID file
+rm -f "$PID_FILE"
+
+log_success "Validator '$NODE_NAME' stopped successfully"
+log_info "Logs are available at: $LOG_FILE"
