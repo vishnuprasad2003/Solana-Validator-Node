@@ -100,6 +100,10 @@ Transaction → RPC Endpoint → Validator → Gossip Network → All Validators
 ### Prerequisites
 
 ```bash
+# Check current system limits
+ulimit -n  # Should show 1000000 (or higher)
+ulimit -l  # Should show unlimited
+
 # System limits (run once, requires logout/login)
 sudo bash -c 'echo "* soft nofile 1000000" >> /etc/security/limits.conf'
 sudo bash -c 'echo "* hard nofile 1000000" >> /etc/security/limits.conf'
@@ -164,6 +168,10 @@ See [Testing](#testing) section for comprehensive test commands.
 ### Step 1: System Configuration
 
 ```bash
+# Check current system limits before applying changes
+ulimit -n  # Check file descriptor limit (should be 1000000 or higher)
+ulimit -l  # Check memory lock limit (should be unlimited)
+
 # File descriptors (required for Solana)
 sudo bash -c 'cat >> /etc/security/limits.conf <<EOF
 * soft nofile 1000000
@@ -173,6 +181,7 @@ sudo bash -c 'cat >> /etc/security/limits.conf <<EOF
 EOF'
 
 # Logout and login for limits to take effect
+# After login, verify with: ulimit -n and ulimit -l
 ```
 
 ### Step 2: Install Solana Tools
