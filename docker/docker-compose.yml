@@ -1,0 +1,30 @@
+version: '3.8'
+
+services:
+  bootstrap:
+    build: ..
+    container_name: solana-bootstrap
+    network_mode: host
+    environment:
+      - NODE_NAME=bootstrap
+    volumes:
+      - ../data:/app/data
+      - ../keys:/app/keys
+      - ../logs:/app/logs
+      - ../configs:/app/configs
+    restart: unless-stopped
+
+  validator-1:
+    build: ..
+    container_name: solana-validator-1
+    network_mode: host
+    environment:
+      - NODE_NAME=validator-1
+    volumes:
+      - ../data:/app/data
+      - ../keys:/app/keys
+      - ../logs:/app/logs
+      - ../configs:/app/configs
+    depends_on:
+      - bootstrap
+    restart: unless-stopped

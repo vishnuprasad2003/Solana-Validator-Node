@@ -1,41 +1,13 @@
-# Git
+keys/
+data/
+logs/
+*.pid
+*.log
+faucet.txt
 .git
 .gitignore
-.gitattributes
-
-# Documentation (will be copied separately if needed)
 *.md
 !README.md
-
-# Logs
-logs/
-*.log
-
-# Data (will be mounted as volumes)
-data/
-
-# Keys (will be mounted as volumes)
-keys/
-
-# Build artifacts
-bin/
-target/
-*.so
-
-# IDE
+.DS_Store
 .vscode/
 .idea/
-*.swp
-*.swo
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Temporary
-*.tmp
-*.bak
-*.pid
-
-# Source code (if building)
-.agave-src/

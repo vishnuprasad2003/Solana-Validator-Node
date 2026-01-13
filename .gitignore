@@ -1,49 +1,28 @@
-# Keys and secrets
-keys/**/*.json
+# Keys and sensitive data
+keys/
 *.json
-!package.json
-!package-lock.json
-!kubernetes/*.json
+!configs/*.conf
 
-# Logs
-logs/**/*.log
-logs/**/*.log.*
-*.log
-
-# Data directories
-data/**/*
-!data/.gitkeep
-
-# PID files
+# Blockchain data
+data/
+logs/
 *.pid
 
-# Build artifacts
-bin/*
-!bin/.gitkeep
-
-# Temporary files
-*.tmp
-*.swp
-*~
+# Runtime files
+faucet.txt
+*.log
 
 # OS files
 .DS_Store
 Thumbs.db
 
-# IDE files
+# Editor files
 .vscode/
 .idea/
-*.code-workspace
+*.swp
+*.swo
+*~
 
-# Source code (if building from source)
-.agave-src/
-
-# Node-specific configs (may contain sensitive info)
-configs/*.conf
-!configs/cluster.conf
-!configs/node.conf.template
-!configs/logrotate.conf
-
-# Environment files
-.env
-.env.local
+# Temporary files
+/tmp/
+*.tmp

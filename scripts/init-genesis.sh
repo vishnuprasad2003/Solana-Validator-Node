@@ -1,175 +1,88 @@
 #!/bin/bash
-#
-# Initialize Genesis for Private Solana Cluster
-# This script creates the genesis configuration for the bootstrap validator
-#
+# Initialize genesis for bootstrap validator
+# Usage: ./scripts/init-genesis.sh [config-file]
 
 set -euo pipefail
-
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# Bootstrap validator key paths
-BOOTSTRAP_IDENTITY_KEY="${IDENTITY_KEY_DIR}/bootstrap-identity.json"
-BOOTSTRAP_VOTE_KEY="${VOTE_KEY_DIR}/bootstrap-vote.json"
-BOOTSTRAP_STAKE_KEY="${STAKE_KEY_DIR}/bootstrap-stake.json"
-FAUCET_KEY="${IDENTITY_KEY_DIR}/faucet.json"
+CONFIG="${1:-${WORKSPACE_ROOT}/configs/node.conf}"
+[[ ! -f "$CONFIG" ]] && { log_error "Config not found: $CONFIG"; exit 1; }
+source "$CONFIG"
 
-# Genesis configuration
-LEDGER_DIR="${BOOTSTRAP_LEDGER_DIR}"
-CLUSTER_TYPE="${CLUSTER_TYPE:-development}"
+[[ "$NODE_TYPE" != "bootstrap" ]] && { log_error "NODE_TYPE must be 'bootstrap'"; exit 1; }
 
-log_info "Initializing Genesis for Private Solana Cluster"
-log_info "Cluster type: $CLUSTER_TYPE"
-log_info "Ledger directory: $LEDGER_DIR"
+log_info "Initializing genesis for: $NODE_NAME"
 
-# Check if Agave tools are installed
-if ! command_exists solana-genesis; then
-    log_error "solana-genesis not found. Please run install.sh first."
-    exit 1
-fi
+# Resolve paths
+IDENTITY="${WORKSPACE_ROOT}/${IDENTITY_KEY}"
+VOTE="${WORKSPACE_ROOT}/${VOTE_KEY}"
+STAKE="${WORKSPACE_ROOT}/${STAKE_KEY}"
+FAUCET="${WORKSPACE_ROOT}/${FAUCET_KEY}"
+LEDGER="${WORKSPACE_ROOT}/${LEDGER_DIR}"
 
-# Check if genesis already exists
-if [[ -d "$LEDGER_DIR" ]] && [[ -f "${LEDGER_DIR}/genesis.bin" ]]; then
-    log_warn "Genesis already exists at ${LEDGER_DIR}"
-    read -p "Do you want to recreate genesis? (y/N): " -n 1 -r
-    echo
-    if [[ ! $REPLY =~ ^[Yy]$ ]]; then
-        log_info "Skipping genesis creation"
-        exit 0
-    fi
-    log_info "Removing existing genesis..."
-    rm -rf "$LEDGER_DIR"
-fi
+# Clean existing
+[[ -f "${LEDGER}/genesis.bin" ]] && { log_warn "Genesis exists, removing..."; rm -rf "$LEDGER"; }
+mkdir -p "$LEDGER" "$(dirname "$IDENTITY")" "$(dirname "$VOTE")" "$(dirname "$FAUCET")"
 
-# Create necessary directories
-check_directory "$LEDGER_DIR"
-check_directory "$(dirname "$BOOTSTRAP_IDENTITY_KEY")"
-check_directory "$(dirname "$BOOTSTRAP_VOTE_KEY")"
-check_directory "$(dirname "$BOOTSTRAP_STAKE_KEY")"
-check_directory "$(dirname "$FAUCET_KEY")"
+# Generate keys
+generate_keypair "$IDENTITY"
+generate_keypair "$VOTE"
+generate_keypair "$STAKE"
+generate_keypair "$FAUCET"
 
-# Generate keypairs if they don't exist
-log_info "Generating keypairs for bootstrap validator..."
+IDENTITY_PUB=$(get_pubkey "$IDENTITY")
+VOTE_PUB=$(get_pubkey "$VOTE")
+STAKE_PUB=$(get_pubkey "$STAKE")
+FAUCET_PUB=$(get_pubkey "$FAUCET")
 
-generate_keypair "$BOOTSTRAP_IDENTITY_KEY" "identity" || exit 1
-generate_keypair "$BOOTSTRAP_VOTE_KEY" "vote" || exit 1
-generate_keypair "$BOOTSTRAP_STAKE_KEY" "stake" || exit 1
-generate_keypair "$FAUCET_KEY" "faucet" || exit 1
+log_info "Identity: $IDENTITY_PUB"
+log_info "Vote: $VOTE_PUB"
+log_info "Faucet: $FAUCET_PUB"
 
-# Get public keys
-BOOTSTRAP_IDENTITY_PUBKEY=$(get_pubkey "$BOOTSTRAP_IDENTITY_KEY") || exit 1
-BOOTSTRAP_VOTE_PUBKEY=$(get_pubkey "$BOOTSTRAP_VOTE_KEY") || exit 1
-BOOTSTRAP_STAKE_PUBKEY=$(get_pubkey "$BOOTSTRAP_STAKE_KEY") || exit 1
-FAUCET_PUBKEY=$(get_pubkey "$FAUCET_KEY") || exit 1
+# Download programs if needed
+"${SCRIPT_DIR}/setup-genesis-programs.sh" || log_warn "Programs setup failed"
 
-log_info "Bootstrap Identity: $BOOTSTRAP_IDENTITY_PUBKEY"
-log_info "Bootstrap Vote: $BOOTSTRAP_VOTE_PUBKEY"
-log_info "Bootstrap Stake: $BOOTSTRAP_STAKE_PUBKEY"
-log_info "Faucet: $FAUCET_PUBKEY"
-
-# Setup essential programs (SPL Token, Token-2022, Associated Token, Metaplex)
-log_info "Setting up essential programs for genesis..."
-if [[ -f "${SCRIPT_DIR}/setup-genesis-programs.sh" ]]; then
-    "${SCRIPT_DIR}/setup-genesis-programs.sh" || {
-        log_warn "Failed to setup programs. Continuing without them..."
-        log_warn "You can deploy programs manually after cluster starts."
-    }
-else
-    log_warn "setup-genesis-programs.sh not found. Skipping program setup."
-fi
-
-# Create genesis
-log_info "Creating genesis configuration..."
-
-# Standard program IDs (from mainnet)
-TOKEN_PROGRAM_ID="TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
-TOKEN_2022_PROGRAM_ID="TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
-ASSOCIATED_TOKEN_PROGRAM_ID="ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
-TOKEN_METADATA_PROGRAM_ID="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
-
-# BPF Loader for upgradeable programs
-BPF_LOADER="BPFLoaderUpgradeab1e11111111111111111111111"
-
-# Programs directory
+# Build genesis command
 PROGRAMS_DIR="${WORKSPACE_ROOT}/programs"
+BPF_LOADER="BPFLoaderUpgradeab1e11111111111111111111111"
+# Use config value or default to 1000 SOL
+BOOTSTRAP_STAKE_LAMPORTS="${BOOTSTRAP_STAKE_LAMPORTS:-1000000000000}"
+ARGS=(--bootstrap-validator "$IDENTITY_PUB" "$VOTE_PUB" "$STAKE_PUB"
+      --bootstrap-validator-stake-lamports "$BOOTSTRAP_STAKE_LAMPORTS"
+      --ledger "$LEDGER" --faucet-pubkey "$FAUCET_PUB"
+      --faucet-lamports "$GENESIS_LAMPORTS" --cluster-type "$CLUSTER_TYPE")
 
-# Build solana-genesis command
-# Note: bootstrap-validator expects: IDENTITY_PUBKEY VOTE_PUBKEY STAKE_PUBKEY (space-separated)
-# Use array to properly handle paths with spaces
-GENESIS_ARGS=(
-    --bootstrap-validator
-    "${BOOTSTRAP_IDENTITY_PUBKEY}"
-    "${BOOTSTRAP_VOTE_PUBKEY}"
-    "${BOOTSTRAP_STAKE_PUBKEY}"
-    --ledger
-    "${LEDGER_DIR}"
-    --faucet-pubkey
-    "${FAUCET_PUBKEY}"
-    --faucet-lamports
-    "${FAUCET_LAMPORTS}"
-    --cluster-type
-    "${CLUSTER_TYPE}"
-)
+# Add programs
+[[ -f "${PROGRAMS_DIR}/spl_token.so" ]] && \
+    ARGS+=(--upgradeable-program "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_token.so" "$FAUCET_PUB")
+[[ -f "${PROGRAMS_DIR}/spl_token_2022.so" ]] && \
+    ARGS+=(--upgradeable-program "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_token_2022.so" "$FAUCET_PUB")
+[[ -f "${PROGRAMS_DIR}/spl_associated_token_account.so" ]] && \
+    ARGS+=(--upgradeable-program "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_associated_token_account.so" "$FAUCET_PUB")
+[[ -f "${PROGRAMS_DIR}/mpl_token_metadata.so" ]] && \
+    ARGS+=(--upgradeable-program "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" "$BPF_LOADER" "${PROGRAMS_DIR}/mpl_token_metadata.so" "$FAUCET_PUB")
 
-# Add SPL and Metaplex programs to genesis
-# Format: --upgradeable-program <PROGRAM_ID> <LOADER_ID> <PROGRAM_FILE> <UPGRADE_AUTHORITY>
-# Use faucet as upgrade authority for private cluster
-UPGRADE_AUTHORITY="${FAUCET_PUBKEY}"
+# Create genesis and capture output
+GENESIS_OUTPUT=$(solana-genesis "${ARGS[@]}" 2>&1) || { log_error "Genesis failed"; exit 1; }
 
-if [[ -f "${PROGRAMS_DIR}/spl_token.so" ]]; then
-    GENESIS_ARGS+=(--upgradeable-program "$TOKEN_PROGRAM_ID" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_token.so" "$UPGRADE_AUTHORITY")
-    log_info "Including SPL Token program in genesis"
+# Extract genesis hash from output (format: "Genesis hash: XXXXX")
+GENESIS_HASH=$(echo "$GENESIS_OUTPUT" | grep -i "genesis hash" | grep -oE '[A-Za-z0-9]{32,}' | head -1 || echo "")
+
+log_success "Genesis created!"
+if [[ -n "$GENESIS_HASH" ]]; then
+    log_info "Hash: $GENESIS_HASH"
+else
+    log_warn "Could not extract genesis hash from output"
+    log_info "You can find it in the genesis output above"
 fi
+log_info "Faucet: $FAUCET_PUB ($(echo "$GENESIS_LAMPORTS / 1000000000" | bc) SOL)"
 
-if [[ -f "${PROGRAMS_DIR}/spl_token_2022.so" ]]; then
-    GENESIS_ARGS+=(--upgradeable-program "$TOKEN_2022_PROGRAM_ID" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_token_2022.so" "$UPGRADE_AUTHORITY")
-    log_info "Including SPL Token-2022 program in genesis"
-fi
-
-if [[ -f "${PROGRAMS_DIR}/spl_associated_token_account.so" ]]; then
-    GENESIS_ARGS+=(--upgradeable-program "$ASSOCIATED_TOKEN_PROGRAM_ID" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_associated_token_account.so" "$UPGRADE_AUTHORITY")
-    log_info "Including Associated Token Account program in genesis"
-fi
-
-if [[ -f "${PROGRAMS_DIR}/mpl_token_metadata.so" ]]; then
-    GENESIS_ARGS+=(--upgradeable-program "$TOKEN_METADATA_PROGRAM_ID" "$BPF_LOADER" "${PROGRAMS_DIR}/mpl_token_metadata.so" "$UPGRADE_AUTHORITY")
-    log_info "Including Metaplex Token Metadata program in genesis"
-fi
-
-# Note: --lamports flag doesn't exist in solana-genesis
-# Use --bootstrap-validator-lamports if you want to customize bootstrap validator lamports
-# if [[ -n "${BOOTSTRAP_VALIDATOR_LAMPORTS:-}" ]]; then
-#     GENESIS_ARGS+=(--bootstrap-validator-lamports "${BOOTSTRAP_VALIDATOR_LAMPORTS}")
-# fi
-
-log_info "Running: solana-genesis ${GENESIS_ARGS[*]}"
-
-# Execute genesis creation
-solana-genesis "${GENESIS_ARGS[@]}" || {
-    log_error "Failed to create genesis"
-    exit 1
-}
-
-# Verify genesis was created
-if [[ ! -f "${LEDGER_DIR}/genesis.bin" ]]; then
-    log_error "Genesis file not found after creation"
-    exit 1
-fi
-
-log_success "Genesis created successfully!"
-log_info "Genesis location: ${LEDGER_DIR}/genesis.bin"
-log_info ""
-log_info "Bootstrap validator configuration:"
-log_info "  Identity key: ${BOOTSTRAP_IDENTITY_KEY}"
-log_info "  Vote key: ${BOOTSTRAP_VOTE_KEY}"
-log_info "  Stake key: ${BOOTSTRAP_STAKE_KEY}"
-log_info "  Ledger: ${LEDGER_DIR}"
-log_info ""
-log_info "Faucet configuration:"
-log_info "  Faucet key: ${FAUCET_KEY}"
-log_info "  Faucet pubkey: ${FAUCET_PUBKEY}"
-log_info ""
-log_info "You can now start the bootstrap validator using:"
-log_info "  ./scripts/start-bootstrap.sh"
+# Save faucet info
+cat > "${WORKSPACE_ROOT}/faucet.txt" <<EOF
+FAUCET_PUBKEY=$FAUCET_PUB
+FAUCET_KEY=$FAUCET_KEY
+GENESIS_HASH=$GENESIS_HASH
+BOOTSTRAP_IDENTITY=$IDENTITY_PUB
+EOF
+log_info "Faucet info saved to: faucet.txt"
