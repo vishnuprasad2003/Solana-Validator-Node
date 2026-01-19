@@ -1,4 +1,4 @@
-.PHONY: help install gen-keys init-genesis start stop build docker-up docker-down clean create-vote-account
+.PHONY: help install gen-keys init-genesis start stop build docker-up docker-down clean create-vote-account upgrade upgrade-check upgrade-status backup
 
 # Default config
 CONFIG ?= node
@@ -23,6 +23,13 @@ help:
 	@echo ""
 	@echo "Utilities:"
 	@echo "  make clean                    Remove data/logs"
+	@echo "  make faucet-private-key       Get faucet private key (base58)"
+	@echo ""
+	@echo "Upgrade & Maintenance:"
+	@echo "  make upgrade                  Full upgrade (backup + update + verify)"
+	@echo "  make upgrade-check            Check current versions"
+	@echo "  make upgrade-status           Show current status"
+	@echo "  make backup                   Create backup before manual changes"
 
 install:
 	@./scripts/install.sh
@@ -53,3 +60,27 @@ docker-down:
 
 clean:
 	@rm -rf data/* logs/* *.pid faucet.txt
+
+faucet-private-key:
+	@./scripts/get-faucet-private-key.sh
+
+# ─────────────────────────────────────────────────────────────────────────────
+# Upgrade & Maintenance
+# ─────────────────────────────────────────────────────────────────────────────
+
+upgrade:
+	@./scripts/upgrade.sh all
+
+upgrade-check:
+	@./scripts/upgrade.sh check
+
+upgrade-status:
+	@./scripts/upgrade.sh status
+
+backup:
+	@./scripts/upgrade.sh backup
+
+rollback:
+	@./scripts/upgrade.sh list-backups
+	@echo ""
+	@echo "Usage: ./scripts/upgrade.sh rollback backups/<timestamp>"

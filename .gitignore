@@ -12,6 +12,14 @@ logs/
 faucet.txt
 *.log
 
+# Node.js (not used - bash scripts only)
+node_modules/
+package.json
+package-lock.json
+
+# Backups (from upgrade script)
+backups/
+
 # OS files
 .DS_Store
 Thumbs.db

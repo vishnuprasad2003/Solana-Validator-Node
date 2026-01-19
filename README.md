@@ -2,6 +2,8 @@
 
 Production-grade Solana private cluster setup with Docker support. Each validator runs independently with centralized configuration.
 
+**Pure Bash Implementation**: All scripts use bash/Python - no Node.js dependencies required.
+
 ## Table of Contents
 
 - [Architecture](#architecture)
@@ -420,6 +422,7 @@ make docker-down          # Stop Docker cluster
 
 # Utilities
 make clean                # Remove data/logs
+make faucet-private-key   # Get faucet private key (base58)
 ```
 
 ## Project Structure
@@ -427,23 +430,34 @@ make clean                # Remove data/logs
 ```
 .
 ├── configs/
-│   └── node.conf              # Config template (copy for each node)
+│   ├── bootstrap.conf          # Bootstrap validator config
+│   └── node.conf               # Config template (copy for each node)
 ├── scripts/
-│   ├── common.sh              # Shared utilities
-│   ├── install.sh              # Install Solana tools
+│   ├── common.sh               # Shared utilities
+│   ├── install.sh              # Install Solana CLI & Agave validator
 │   ├── gen-keys.sh             # Generate keypairs
 │   ├── init-genesis.sh         # Create genesis (bootstrap only)
 │   ├── create-vote-account.sh  # Create vote account (validators)
 │   ├── start-validator.sh      # Start validator
 │   ├── stop-validator.sh       # Stop validator
+│   ├── get-faucet-private-key.sh  # Extract faucet private key (base58)
+│   ├── upgrade.sh              # Upgrade dependencies
 │   └── docker-entrypoint.sh    # Docker entrypoint
 ├── docker/
 │   ├── Dockerfile              # Docker image
 │   └── docker-compose.yml      # Compose setup
 ├── programs/                   # SPL program binaries
+│   ├── spl_token.so
+│   ├── spl_token_2022.so
+│   ├── spl_associated_token_account.so
+│   └── mpl_token_metadata.so
 ├── Makefile                    # Common commands
-└── README.md                   # This file
+├── README.md                   # This file
+├── .gitignore                  # Git ignore rules
+└── .dockerignore              # Docker ignore rules
 ```
+
+**Note**: Runtime directories (`data/`, `logs/`, `keys/`, `backups/`) are gitignored and created automatically.
 
 ## Testing
 
@@ -736,16 +750,24 @@ The genesis hash is shown in `solana-genesis` output. If `faucet.txt` has empty 
 
 ### Snapshot Errors
 
-If validator crashes with snapshot errors:
+If validator crashes with snapshot errors (e.g., "sending on a disconnected channel", "failed to load bank"):
 ```bash
-# Remove corrupted snapshots
+# Stop the validator first
+make stop NODE=<node-name>
+
+# Remove corrupted snapshots and accounts
 rm -rf data/<node-name>/snapshots
 rm -rf data/<node-name>/incremental-snapshots
 rm -rf data/<node-name>/accounts
+rm -rf data/<node-name>/accounts_hash_cache
+rm -rf data/<node-name>/accounts_index
 
-# Restart validator (will sync from genesis)
+# Keep genesis.bin - validator will rebuild from genesis
+# Restart validator (will rebuild from genesis)
 make start CONFIG=<node-name>
 ```
+
+**Note**: This will cause the validator to rebuild from genesis, which may take a few minutes. All previous transaction history will be lost, but the validator will continue operating.
 
 ### Cross-Node Data Not Syncing
 
@@ -754,13 +776,160 @@ make start CONFIG=<node-name>
 3. **Wait for sync**: New transactions may take a few seconds to propagate
 4. **Check gossip connectivity**: Validators must be able to communicate via UDP
 
+### Getting Faucet Private Key
+
+To get the faucet private key in base58 format (for use in external applications):
+
+```bash
+# Get faucet private key
+make faucet-private-key
+
+# Or specify a different keypair file
+./scripts/get-faucet-private-key.sh keys/my-keypair.json
+```
+
+**Requirements:**
+- Python3 with `base58` module: `pip install base58`
+- OR Node.js with `bs58` module: `npm install -g bs58`
+
+The script will automatically detect and use the available tool.
+
+## Upgrading Dependencies
+
+The upgrade script provides production-grade dependency management with backup, verification, and rollback support.
+
+### Full Upgrade (Recommended)
+
+Upgrade all dependencies while preserving data:
+
+```bash
+# Full upgrade with automatic backup
+make upgrade
+
+# Or directly:
+./scripts/upgrade.sh all
+```
+
+This will:
+- ✅ Create automatic backup of binaries, configs, keys, and programs
+- ✅ Upgrade Solana CLI tools
+- ✅ Upgrade Agave validator (or Solana validator as fallback)
+- ✅ Update SPL programs (if available)
+- ✅ Verify all upgrades
+- ✅ Clean up old backups (keeps last 5)
+
+**Important**: All validator data, keys, configs, and ledger data are preserved. Only binaries and dependencies are updated.
+
+### Selective Upgrades
+
+Upgrade specific components:
+
+```bash
+# Check current versions
+make upgrade-check
+
+# Upgrade only Solana CLI
+./scripts/upgrade.sh update-cli
+
+# Upgrade only Agave validator
+./scripts/upgrade.sh update-validator
+
+# Upgrade Solana CLI and validator together
+./scripts/upgrade.sh update
+
+# Update SPL programs
+./scripts/upgrade.sh update-programs
+```
+
+### Backup & Rollback
+
+```bash
+# Create manual backup
+make backup
+
+# List available backups
+./scripts/upgrade.sh list-backups
+
+# Rollback to specific backup
+./scripts/upgrade.sh rollback backups/20260115_120000
+
+# Clean old backups (keep last 5)
+./scripts/upgrade.sh cleanup 5
+```
+
+### Status & Verification
+
+```bash
+# Show current status
+make upgrade-status
+
+# Verify installation
+./scripts/upgrade.sh verify
+```
+
+### Production Best Practices
+
+1. **Always backup before upgrading**:
+   ```bash
+   make backup
+   ```
+
+2. **Stop validators before upgrading**:
+   ```bash
+   make stop NODE=bootstrap
+   make stop NODE=validator-1
+   make upgrade
+   make start CONFIG=bootstrap
+   make start CONFIG=validator-1
+   ```
+
+3. **Monitor after upgrade**:
+   ```bash
+   tail -f logs/bootstrap.log
+   # Check RPC health
+   curl -s http://localhost:8899 -X POST -H "Content-Type: application/json" \
+     -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' | jq
+   ```
+
+4. **Keep backups**: The script automatically keeps the last 5 backups
+
+5. **Rollback if needed**: Use the rollback command if issues occur
+
+6. **Test in staging first** (if available)
+
+### What Gets Upgraded
+
+| Component | Command | Data Affected |
+|-----------|---------|---------------|
+| Solana CLI | `update-cli` | Binary only (data preserved) |
+| Agave Validator | `update-validator` | Binary only (data preserved) |
+| SPL Programs | `update-programs` | Program binaries only |
+
+**All validator data, keys, configs, and ledger data are preserved during upgrades.**
+
+### Upgrade Process Flow
+
+```
+1. Check prerequisites (curl, wget, jq)
+2. Stop running validators (with confirmation)
+3. Create backup (binaries, configs, keys, programs)
+4. Upgrade Solana CLI
+5. Upgrade Agave validator
+6. Update SPL programs
+7. Verify all upgrades
+8. Clean old backups
+9. Ready to restart validators
+```
+
 ## Notes
 
 - **Genesis**: Created once for bootstrap, shared via snapshots
-- **Keys**: Stored in `keys/` directory (gitignored)
-- **Data**: Stored in `data/` directory (gitignored)
+- **Keys**: Stored in `keys/` directory (gitignored, never committed)
+- **Data**: Stored in `data/` directory (gitignored, ledger data)
 - **Logs**: Stored in `logs/` directory (gitignored)
+- **Backups**: Created by upgrade script in `backups/` (gitignored)
 - **Faucet info**: Saved to `faucet.txt` after genesis (gitignored)
+- **No Node.js dependencies**: All scripts use bash/Python (no package.json needed)
 
 ## Security
 
