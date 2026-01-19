@@ -25,7 +25,7 @@ mkdir -p "$LEDGER" "$(dirname "$LOG")"
 
 VALIDATOR=$(get_validator_bin) || exit 1
 
-# Build command - use config value for limit-ledger-size
+# Build command - conditionally add limit-ledger-size flag
 CMD=("$VALIDATOR"
     --identity "$IDENTITY"
     --vote-account "$VOTE"
@@ -35,9 +35,14 @@ CMD=("$VALIDATOR"
     --rpc-bind-address "$RPC_BIND_ADDRESS"
     --dynamic-port-range "${DYNAMIC_PORT_RANGE_START}-${DYNAMIC_PORT_RANGE_END}"
     --log "$LOG"
-    --full-snapshot-interval-slots 400
-    --limit-ledger-size "${LIMIT_LEDGER_SIZE:-50000000}"
-    --no-poh-speed-test
+    --full-snapshot-interval-slots 400)
+
+# Add --limit-ledger-size only if LIMIT_LEDGER_SIZE is set and not "unlimited" or "0"
+if [[ -n "${LIMIT_LEDGER_SIZE:-}" ]] && [[ "${LIMIT_LEDGER_SIZE}" != "unlimited" ]] && [[ "${LIMIT_LEDGER_SIZE}" != "0" ]]; then
+    CMD+=(--limit-ledger-size "$LIMIT_LEDGER_SIZE")
+fi
+
+CMD+=(--no-poh-speed-test
     --no-os-network-limits-test
     --full-rpc-api
     --allow-private-addr)
