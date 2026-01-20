@@ -12,11 +12,11 @@ source "$CONFIG"
 
 log_info "Starting: $NODE_NAME (type: $NODE_TYPE)"
 
-# Resolve paths
-IDENTITY="${WORKSPACE_ROOT}/${IDENTITY_KEY}"
-VOTE="${WORKSPACE_ROOT}/${VOTE_KEY}"
-LEDGER="${WORKSPACE_ROOT}/${LEDGER_DIR}"
-LOG="${WORKSPACE_ROOT}/${LOG_FILE}"
+# Resolve paths (supports absolute paths like /solana/...)
+IDENTITY=$(resolve_path "$IDENTITY_KEY")
+VOTE=$(resolve_path "$VOTE_KEY")
+LEDGER=$(resolve_path "$LEDGER_DIR")
+LOG=$(resolve_path "$LOG_FILE")
 
 [[ ! -f "$IDENTITY" ]] && { log_error "Identity key not found: $IDENTITY"; exit 1; }
 [[ ! -f "$VOTE" ]] && { log_error "Vote key not found: $VOTE"; exit 1; }

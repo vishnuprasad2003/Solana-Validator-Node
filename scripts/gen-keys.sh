@@ -12,10 +12,14 @@ source "$CONFIG"
 
 log_info "Generating keys for: $NODE_NAME"
 
-generate_keypair "${WORKSPACE_ROOT}/${IDENTITY_KEY}"
-generate_keypair "${WORKSPACE_ROOT}/${VOTE_KEY}"
-generate_keypair "${WORKSPACE_ROOT}/${STAKE_KEY}"
+IDENTITY_KEY_RESOLVED=$(resolve_path "$IDENTITY_KEY")
+VOTE_KEY_RESOLVED=$(resolve_path "$VOTE_KEY")
+STAKE_KEY_RESOLVED=$(resolve_path "$STAKE_KEY")
+
+generate_keypair "$IDENTITY_KEY_RESOLVED"
+generate_keypair "$VOTE_KEY_RESOLVED"
+generate_keypair "$STAKE_KEY_RESOLVED"
 
 log_success "Keys generated!"
-log_info "Identity: $(get_pubkey "${WORKSPACE_ROOT}/${IDENTITY_KEY}")"
-log_info "Vote: $(get_pubkey "${WORKSPACE_ROOT}/${VOTE_KEY}")"
+log_info "Identity: $(get_pubkey "$IDENTITY_KEY_RESOLVED")"
+log_info "Vote: $(get_pubkey "$VOTE_KEY_RESOLVED")"

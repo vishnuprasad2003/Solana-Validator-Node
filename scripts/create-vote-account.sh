@@ -28,10 +28,15 @@ if [[ "$NODE_TYPE" == "bootstrap" ]]; then
     exit 0
 fi
 
-# Resolve paths
-IDENTITY_PATH="${WORKSPACE_ROOT}/${IDENTITY_KEY}"
-VOTE_PATH="${WORKSPACE_ROOT}/${VOTE_KEY}"
-FAUCET_KEY="${WORKSPACE_ROOT}/keys/faucet.json"
+# Resolve paths (supports absolute paths like /solana/...)
+IDENTITY_PATH=$(resolve_path "$IDENTITY_KEY")
+VOTE_PATH=$(resolve_path "$VOTE_KEY")
+# Faucet key location - try absolute first, then relative
+if [[ -f "/solana/keys/faucet.json" ]]; then
+    FAUCET_KEY="/solana/keys/faucet.json"
+else
+    FAUCET_KEY=$(resolve_path "keys/faucet.json")
+fi
 
 # Check if vote account already exists
 VOTE_PUBKEY=$(get_pubkey "$VOTE_PATH" 2>/dev/null || echo "")

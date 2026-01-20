@@ -6,6 +6,18 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 
+# Resolve path: if absolute (starts with /), use as-is; if relative, prepend WORKSPACE_ROOT
+resolve_path() {
+    local path="$1"
+    if [[ "$path" == /* ]]; then
+        # Absolute path - use as-is
+        echo "$path"
+    else
+        # Relative path - prepend WORKSPACE_ROOT
+        echo "${WORKSPACE_ROOT}/${path}"
+    fi
+}
+
 # Colors
 RED='\033[0;31m'; GREEN='\033[0;32m'; YELLOW='\033[1;33m'; NC='\033[0m'
 

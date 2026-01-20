@@ -5,7 +5,12 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="$(cd "${SCRIPT_DIR}/.." && pwd)"
 
-PROGRAMS_DIR="${WORKSPACE_ROOT}/programs"
+# Use Azure File Share for programs if mounted, otherwise project root
+if [[ -d "/solana" ]]; then
+    PROGRAMS_DIR="/solana/programs"
+else
+    PROGRAMS_DIR="${WORKSPACE_ROOT}/programs"
+fi
 mkdir -p "$PROGRAMS_DIR"
 
 declare -A PROGRAMS=(

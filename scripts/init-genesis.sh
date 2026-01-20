@@ -14,12 +14,12 @@ source "$CONFIG"
 
 log_info "Initializing genesis for: $NODE_NAME"
 
-# Resolve paths
-IDENTITY="${WORKSPACE_ROOT}/${IDENTITY_KEY}"
-VOTE="${WORKSPACE_ROOT}/${VOTE_KEY}"
-STAKE="${WORKSPACE_ROOT}/${STAKE_KEY}"
-FAUCET="${WORKSPACE_ROOT}/${FAUCET_KEY}"
-LEDGER="${WORKSPACE_ROOT}/${LEDGER_DIR}"
+# Resolve paths (supports absolute paths like /solana/...)
+IDENTITY=$(resolve_path "$IDENTITY_KEY")
+VOTE=$(resolve_path "$VOTE_KEY")
+STAKE=$(resolve_path "$STAKE_KEY")
+FAUCET=$(resolve_path "$FAUCET_KEY")
+LEDGER=$(resolve_path "$LEDGER_DIR")
 
 # Clean existing
 [[ -f "${LEDGER}/genesis.bin" ]] && { log_warn "Genesis exists, removing..."; rm -rf "$LEDGER"; }
@@ -78,8 +78,9 @@ else
 fi
 log_info "Faucet: $FAUCET_PUB ($(echo "$GENESIS_LAMPORTS / 1000000000" | bc) SOL)"
 
-# Save faucet info
-cat > "${WORKSPACE_ROOT}/faucet.txt" <<EOF
+# Save faucet info (in same directory as keys for easy access)
+FAUCET_INFO_DIR=$(dirname "$FAUCET")
+cat > "${FAUCET_INFO_DIR}/faucet.txt" <<EOF
 FAUCET_PUBKEY=$FAUCET_PUB
 FAUCET_KEY=$FAUCET_KEY
 GENESIS_HASH=$GENESIS_HASH
