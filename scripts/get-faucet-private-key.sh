@@ -7,17 +7,8 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "${SCRIPT_DIR}/common.sh"
 
-# Default to faucet key - check Azure File Share first, then project root
-if [[ -n "${1:-}" ]]; then
-    KEY_FILE="$1"
-else
-    # Try Azure File Share first, then project root
-    if [[ -f "/solana/keys/faucet.json" ]]; then
-        KEY_FILE="/solana/keys/faucet.json"
-    else
-        KEY_FILE="${WORKSPACE_ROOT}/keys/faucet.json"
-    fi
-fi
+# Default to faucet key (stored locally, NOT in Azure File Share)
+KEY_FILE="${1:-${WORKSPACE_ROOT}/keys/faucet.json}"
 
 # Resolve path if relative
 [[ "$KEY_FILE" != /* ]] && KEY_FILE="${WORKSPACE_ROOT}/${KEY_FILE}"

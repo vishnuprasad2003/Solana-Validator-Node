@@ -226,7 +226,7 @@ make init-genesis CONFIG=bootstrap
 make start CONFIG=bootstrap
 
 # Wait for RPC to be ready (check logs)
-tail -f logs/bootstrap.log
+tail -f /solana/logs/bootstrap.log
 ```
 
 ### Step 5: Validator Configuration
@@ -298,7 +298,40 @@ EXPECTED_GENESIS_HASH="<genesis-hash>"
 
 # Performance
 LIMIT_LEDGER_SIZE=50000000
+
+# Log Storage
+# Logs are automatically stored in Azure File Share (/solana/logs/)
+# Relative LOG_FILE paths resolve to /solana/logs/<filename>
+# Absolute LOG_FILE paths are used as-is
+LOG_FILE="logs/${NODE_NAME}.log"  # Stored in /solana/logs/${NODE_NAME}.log
 ```
+
+### Azure File Share Log Storage
+
+**Logs are automatically stored in Azure File Share** mounted at `/solana`:
+
+- **Log Location**: `/solana/logs/` (Azure File Share)
+- **Other Data**: Keys, ledger, and configs remain in project directories (local storage)
+- **Automatic Resolution**: Relative `LOG_FILE` paths automatically resolve to `/solana/logs/<filename>`
+- **Custom Paths**: Absolute `LOG_FILE` paths are used as-is (e.g., `/custom/path/logs/node.log`)
+
+**Example**:
+```bash
+# In config file:
+LOG_FILE="logs/bootstrap.log"  # Relative path
+
+# Resolves to:
+# /solana/logs/bootstrap.log  (Azure File Share)
+
+# Or use absolute path:
+LOG_FILE="/solana/logs/bootstrap.log"  # Explicit Azure File Share path
+```
+
+**Benefits**:
+- Centralized log storage and backup
+- Accessible from multiple VMs
+- Persistent across VM restarts
+- Easy log aggregation and monitoring
 
 ### Port Planning
 
@@ -433,7 +466,7 @@ make faucet-private-key   # Get faucet private key (base58)
 │   ├── bootstrap.conf          # Bootstrap validator config
 │   └── node.conf               # Config template (copy for each node)
 ├── scripts/
-│   ├── common.sh               # Shared utilities
+│   ├── common.sh               # Shared utilities (includes Azure File Share log resolution)
 │   ├── install.sh              # Install Solana CLI & Agave validator
 │   ├── gen-keys.sh             # Generate keypairs
 │   ├── init-genesis.sh         # Create genesis (bootstrap only)
@@ -447,6 +480,10 @@ make faucet-private-key   # Get faucet private key (base58)
 │   ├── Dockerfile              # Docker image
 │   └── docker-compose.yml      # Compose setup
 ├── programs/                   # SPL program binaries
+├── keys/                       # Keypairs (LOCAL storage - NOT in Azure File Share)
+├── data/                       # Ledger data (LOCAL storage - NOT in Azure File Share)
+├── programs/                   # SPL program binaries (LOCAL storage - NOT in Azure File Share)
+└── /solana/logs/               # Logs (Azure File Share - ONLY logs go here!)
 │   ├── spl_token.so
 │   ├── spl_token_2022.so
 │   ├── spl_associated_token_account.so
@@ -728,7 +765,7 @@ Save as `test-cluster.sh`, make executable (`chmod +x test-cluster.sh`), and run
 1. **Check config file exists**: `configs/<node-name>.conf`
 2. **Verify keypairs exist**: `ls keys/<node-name>-*.json`
 3. **Check ports available**: `ss -tuln | grep <port>`
-4. **Review logs**: `tail -f logs/<node-name>.log`
+4. **Review logs**: `tail -f /solana/logs/<node-name>.log`
 
 ### Validator Not Joining Cluster
 
@@ -742,7 +779,7 @@ Save as `test-cluster.sh`, make executable (`chmod +x test-cluster.sh`), and run
 1. **Check validator is running**: `ps aux | grep agave-validator`
 2. **Verify RPC port**: `netstat -tlnp | grep 8899`
 3. **Check firewall**: `sudo ufw status`
-4. **Review logs**: `tail -f logs/<node-name>.log | grep -i rpc`
+4. **Review logs**: `tail -f /solana/logs/<node-name>.log | grep -i rpc`
 
 ### Genesis Hash Not Found
 
@@ -885,7 +922,7 @@ make upgrade-status
 
 3. **Monitor after upgrade**:
    ```bash
-   tail -f logs/bootstrap.log
+   tail -f /solana/logs/bootstrap.log
    # Check RPC health
    curl -s http://localhost:8899 -X POST -H "Content-Type: application/json" \
      -d '{"jsonrpc":"2.0","id":1,"method":"getHealth"}' | jq

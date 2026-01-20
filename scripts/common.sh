@@ -6,15 +6,33 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 WORKSPACE_ROOT="${WORKSPACE_ROOT:-$(cd "${SCRIPT_DIR}/.." && pwd)}"
 
-# Resolve path: if absolute (starts with /), use as-is; if relative, prepend WORKSPACE_ROOT
+# Azure File Share mount point for logs (ONLY logs go here)
+AZURE_LOG_DIR="${AZURE_LOG_DIR:-/solana/logs}"
+
+# Resolve path: if absolute, use as-is; if relative, prepend WORKSPACE_ROOT
+# NOTE: This is for keys/data/programs - they stay LOCAL, NOT in Azure File Share
 resolve_path() {
     local path="$1"
     if [[ "$path" == /* ]]; then
         # Absolute path - use as-is
         echo "$path"
     else
-        # Relative path - prepend WORKSPACE_ROOT
+        # Relative path - prepend WORKSPACE_ROOT (local storage)
         echo "${WORKSPACE_ROOT}/${path}"
+    fi
+}
+
+# Resolve log path: if absolute, use as-is; if relative, use Azure File Share
+# NOTE: ONLY logs go to Azure File Share
+resolve_log_path() {
+    local log_path="$1"
+    if [[ "$log_path" == /* ]]; then
+        # Absolute path - use as-is
+        echo "$log_path"
+    else
+        # Relative path - use Azure File Share (ONLY for logs)
+        local log_filename=$(basename "$log_path")
+        echo "${AZURE_LOG_DIR}/${log_filename}"
     fi
 }
 

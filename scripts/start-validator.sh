@@ -12,15 +12,17 @@ source "$CONFIG"
 
 log_info "Starting: $NODE_NAME (type: $NODE_TYPE)"
 
-# Resolve paths (supports absolute paths like /solana/...)
+# Resolve paths (keys/data stay LOCAL, only logs go to Azure File Share)
 IDENTITY=$(resolve_path "$IDENTITY_KEY")
 VOTE=$(resolve_path "$VOTE_KEY")
 LEDGER=$(resolve_path "$LEDGER_DIR")
-LOG=$(resolve_path "$LOG_FILE")
+# Logs go to Azure File Share (/solana/logs) - ONLY logs!
+LOG=$(resolve_log_path "$LOG_FILE")
 
 [[ ! -f "$IDENTITY" ]] && { log_error "Identity key not found: $IDENTITY"; exit 1; }
 [[ ! -f "$VOTE" ]] && { log_error "Vote key not found: $VOTE"; exit 1; }
 
+# Create directories (Azure File Share for logs, local for ledger)
 mkdir -p "$LEDGER" "$(dirname "$LOG")"
 
 VALIDATOR=$(get_validator_bin) || exit 1

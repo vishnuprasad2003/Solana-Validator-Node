@@ -14,7 +14,7 @@ source "$CONFIG"
 
 log_info "Initializing genesis for: $NODE_NAME"
 
-# Resolve paths (supports absolute paths like /solana/...)
+# Resolve paths (keys/data stay LOCAL, NOT in Azure File Share)
 IDENTITY=$(resolve_path "$IDENTITY_KEY")
 VOTE=$(resolve_path "$VOTE_KEY")
 STAKE=$(resolve_path "$STAKE_KEY")
@@ -78,9 +78,8 @@ else
 fi
 log_info "Faucet: $FAUCET_PUB ($(echo "$GENESIS_LAMPORTS / 1000000000" | bc) SOL)"
 
-# Save faucet info (in same directory as keys for easy access)
-FAUCET_INFO_DIR=$(dirname "$FAUCET")
-cat > "${FAUCET_INFO_DIR}/faucet.txt" <<EOF
+# Save faucet info (in project root, not Azure File Share)
+cat > "${WORKSPACE_ROOT}/faucet.txt" <<EOF
 FAUCET_PUBKEY=$FAUCET_PUB
 FAUCET_KEY=$FAUCET_KEY
 GENESIS_HASH=$GENESIS_HASH

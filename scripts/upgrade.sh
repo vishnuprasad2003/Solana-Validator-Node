@@ -159,10 +159,8 @@ create_backup() {
         log_info "✓ Keys backed up"
     fi
     
-    # Backup programs (check Azure File Share first, then project root)
-    if [[ -d "/solana/programs" ]]; then
-        cp -r "/solana/programs" "${backup_path}/" 2>/dev/null && log_info "✓ Programs backed up from /solana/programs"
-    elif [[ -d "${WORKSPACE_ROOT}/programs" ]]; then
+    # Backup programs (stored locally, NOT in Azure File Share)
+    if [[ -d "${WORKSPACE_ROOT}/programs" ]]; then
         cp -r "${WORKSPACE_ROOT}/programs" "${backup_path}/" && log_info "✓ Programs backed up"
     fi
     
@@ -370,13 +368,8 @@ upgrade_solana_all() {
 upgrade_spl_programs() {
     log_section "Upgrading SPL Programs"
 
-    # Use Azure File Share for programs if mounted, otherwise project root
-    local programs_dir=""
-    if [[ -d "/solana" ]]; then
-        programs_dir="/solana/programs"
-    else
-        programs_dir="${WORKSPACE_ROOT}/programs"
-    fi
+    # Programs stored locally (NOT in Azure File Share - only logs go there)
+    local programs_dir="${WORKSPACE_ROOT}/programs"
     mkdir -p "$programs_dir"
     
     # List of SPL programs to download
