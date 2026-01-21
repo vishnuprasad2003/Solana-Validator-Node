@@ -46,19 +46,37 @@ get_pubkey() {
 }
 
 get_validator_bin() {
-    # Prefer agave-validator from PATH (if available)
+    # Check multiple locations for agave-validator (preferred)
+    local install_bin="$HOME/.local/share/solana/install/active_release/bin"
+    
+    # Check PATH first
     if command_exists agave-validator; then
         echo "agave-validator"
         return 0
     fi
     
-    # Check in standard install location
-    local install_bin="$HOME/.local/share/solana/install/active_release/bin"
-    [[ -f "$install_bin/agave-validator" ]] && echo "$install_bin/agave-validator" && return 0
-    [[ -f "$install_bin/solana-validator" ]] && echo "$install_bin/solana-validator" && return 0
+    # Check standard install location
+    if [[ -f "$install_bin/agave-validator" ]]; then
+        echo "$install_bin/agave-validator"
+        return 0
+    fi
     
-    # Fallback to PATH
-    command_exists solana-validator && echo "solana-validator" && return 0
+    # Check /usr/local/bin (where Anza installer sometimes puts it)
+    if [[ -f "/usr/local/bin/agave-validator" ]]; then
+        echo "/usr/local/bin/agave-validator"
+        return 0
+    fi
+    
+    # Fallback to solana-validator
+    if [[ -f "$install_bin/solana-validator" ]]; then
+        echo "$install_bin/solana-validator"
+        return 0
+    fi
+    
+    if command_exists solana-validator; then
+        echo "solana-validator"
+        return 0
+    fi
     
     log_error "Validator binary not found. Run: make install"
     return 1
