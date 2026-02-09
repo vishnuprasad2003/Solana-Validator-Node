@@ -1,36 +1,33 @@
-# Keys and sensitive data
-keys/
-*.json
-!configs/*.conf
-
-# Blockchain data
+# Runtime data (stored under BASE_DIR, default /solana)
 data/
 logs/
+keys/
+pids/
+backups/
 *.pid
+
+# Keys and sensitive data
+*.json
+!configs/*.conf
 
 # Runtime files
 faucet.txt
 *.log
 
-# Node.js (not used - bash scripts only)
+# Build
 node_modules/
-package.json
-package-lock.json
 
-# Backups (from upgrade script)
-backups/
-
-# OS files
+# OS
 .DS_Store
 Thumbs.db
 
-# Editor files
+# Editors
 .vscode/
 .idea/
 *.swp
 *.swo
 *~
 
-# Temporary files
+# Temp
 /tmp/
 *.tmp

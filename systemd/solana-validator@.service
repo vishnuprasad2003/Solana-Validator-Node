@@ -1,0 +1,32 @@
+[Unit]
+Description=Solana Validator Node (%i)
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=azureuser
+WorkingDirectory=/home/azureuser/Solana-Validator-Node
+Environment="PATH=/home/azureuser/.local/share/solana/install/active_release/bin:/usr/local/bin:/usr/bin:/bin"
+ExecStart=/bin/bash -c 'cd /home/azureuser/Solana-Validator-Node && ./scripts/start-validator.sh configs/%i.conf'
+ExecStop=/bin/bash -c 'cd /home/azureuser/Solana-Validator-Node && ./scripts/stop-validator.sh configs/%i.conf'
+Restart=on-failure
+RestartSec=15
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=solana-%i
+
+# Resource limits (Solana requires high file descriptors)
+LimitNOFILE=1000000
+LimitMEMLOCK=infinity
+
+# Security
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

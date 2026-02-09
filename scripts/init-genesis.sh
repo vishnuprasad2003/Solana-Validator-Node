@@ -1,89 +1,79 @@
 #!/bin/bash
-# Initialize genesis for bootstrap validator
-# Usage: ./scripts/init-genesis.sh [config-file]
-
+# ─────────────────────────────────────────────────────────────────────────────
+# Initialise genesis for the bootstrap validator
+# Usage: ./scripts/init-genesis.sh <config-file>
+# ─────────────────────────────────────────────────────────────────────────────
 set -euo pipefail
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-source "${SCRIPT_DIR}/common.sh"
+source "$(dirname "$0")/common.sh"
 
-CONFIG="${1:-${WORKSPACE_ROOT}/configs/node.conf}"
+CONFIG="${1:?Usage: $0 <config-file>}"
 [[ ! -f "$CONFIG" ]] && { log_error "Config not found: $CONFIG"; exit 1; }
 source "$CONFIG"
 
 [[ "$NODE_TYPE" != "bootstrap" ]] && { log_error "NODE_TYPE must be 'bootstrap'"; exit 1; }
 
-log_info "Initializing genesis for: $NODE_NAME"
+log_info "Initialising genesis for: $NODE_NAME"
+ensure_dirs
 
-# Resolve paths (supports absolute paths like /solana/...)
-IDENTITY=$(resolve_path "$IDENTITY_KEY")
-VOTE=$(resolve_path "$VOTE_KEY")
-STAKE=$(resolve_path "$STAKE_KEY")
-FAUCET=$(resolve_path "$FAUCET_KEY")
-LEDGER=$(resolve_path "$LEDGER_DIR")
+# ── Clean existing ──────────────────────────────────────────────────────────
+[[ -f "${LEDGER_DIR}/genesis.bin" ]] && { log_warn "Genesis exists — removing..."; rm -rf "$LEDGER_DIR"; }
+mkdir -p "$LEDGER_DIR"
 
-# Clean existing
-[[ -f "${LEDGER}/genesis.bin" ]] && { log_warn "Genesis exists, removing..."; rm -rf "$LEDGER"; }
-mkdir -p "$LEDGER" "$(dirname "$IDENTITY")" "$(dirname "$VOTE")" "$(dirname "$FAUCET")"
+# ── Keys ────────────────────────────────────────────────────────────────────
+generate_keypair "$IDENTITY_KEY"
+generate_keypair "$VOTE_KEY"
+generate_keypair "$STAKE_KEY"
+generate_keypair "$FAUCET_KEY"
 
-# Generate keys
-generate_keypair "$IDENTITY"
-generate_keypair "$VOTE"
-generate_keypair "$STAKE"
-generate_keypair "$FAUCET"
-
-IDENTITY_PUB=$(get_pubkey "$IDENTITY")
-VOTE_PUB=$(get_pubkey "$VOTE")
-STAKE_PUB=$(get_pubkey "$STAKE")
-FAUCET_PUB=$(get_pubkey "$FAUCET")
+IDENTITY_PUB=$(get_pubkey "$IDENTITY_KEY")
+VOTE_PUB=$(get_pubkey "$VOTE_KEY")
+STAKE_PUB=$(get_pubkey "$STAKE_KEY")
+FAUCET_PUB=$(get_pubkey "$FAUCET_KEY")
 
 log_info "Identity: $IDENTITY_PUB"
-log_info "Vote: $VOTE_PUB"
-log_info "Faucet: $FAUCET_PUB"
+log_info "Vote:     $VOTE_PUB"
+log_info "Faucet:   $FAUCET_PUB"
 
-# Download programs if needed
-"${SCRIPT_DIR}/setup-genesis-programs.sh" || log_warn "Programs setup failed"
+# ── Download SPL programs if needed ─────────────────────────────────────────
+"${SCRIPT_DIR}/setup-genesis-programs.sh" "$CONFIG" || log_warn "Programs setup had issues"
 
-# Build genesis command
-PROGRAMS_DIR="${WORKSPACE_ROOT}/programs"
+# ── Build genesis args ──────────────────────────────────────────────────────
 BPF_LOADER="BPFLoaderUpgradeab1e11111111111111111111111"
-# Use config value or default to 1000 SOL
-BOOTSTRAP_STAKE_LAMPORTS="${BOOTSTRAP_STAKE_LAMPORTS:-1000000000000}"
-ARGS=(--bootstrap-validator "$IDENTITY_PUB" "$VOTE_PUB" "$STAKE_PUB"
-      --bootstrap-validator-stake-lamports "$BOOTSTRAP_STAKE_LAMPORTS"
-      --ledger "$LEDGER" --faucet-pubkey "$FAUCET_PUB"
-      --faucet-lamports "$GENESIS_LAMPORTS" --cluster-type "$CLUSTER_TYPE")
+ARGS=(
+    --bootstrap-validator "$IDENTITY_PUB" "$VOTE_PUB" "$STAKE_PUB"
+    --bootstrap-validator-stake-lamports "${BOOTSTRAP_STAKE_LAMPORTS:-1000000000000}"
+    --ledger "$LEDGER_DIR"
+    --faucet-pubkey "$FAUCET_PUB"
+    --faucet-lamports "$GENESIS_LAMPORTS"
+    --cluster-type "$CLUSTER_TYPE"
+)
 
-# Add programs
-[[ -f "${PROGRAMS_DIR}/spl_token.so" ]] && \
-    ARGS+=(--upgradeable-program "TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_token.so" "$FAUCET_PUB")
-[[ -f "${PROGRAMS_DIR}/spl_token_2022.so" ]] && \
-    ARGS+=(--upgradeable-program "TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_token_2022.so" "$FAUCET_PUB")
-[[ -f "${PROGRAMS_DIR}/spl_associated_token_account.so" ]] && \
-    ARGS+=(--upgradeable-program "ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL" "$BPF_LOADER" "${PROGRAMS_DIR}/spl_associated_token_account.so" "$FAUCET_PUB")
-[[ -f "${PROGRAMS_DIR}/mpl_token_metadata.so" ]] && \
-    ARGS+=(--upgradeable-program "metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s" "$BPF_LOADER" "${PROGRAMS_DIR}/mpl_token_metadata.so" "$FAUCET_PUB")
+# Add programs from PROGRAMS_DIR
+declare -A GENESIS_PROGRAMS=(
+    ["spl_token.so"]="TokenkegQfeZyiNwAJbNbGKPFXCWuBvf9Ss623VQ5DA"
+    ["spl_token_2022.so"]="TokenzQdBNbLqP5VEhdkAS6EPFLC1PHnBqCXEpPxuEb"
+    ["spl_associated_token_account.so"]="ATokenGPvbdGVxr1b2hvZbsiqW5xWH25efTNsLJA8knL"
+    ["mpl_token_metadata.so"]="metaqbxxUerdq28cj1RbAWkYQm3ybzjb6a8bt518x1s"
+)
+for prog_file in "${!GENESIS_PROGRAMS[@]}"; do
+    local_path="${PROGRAMS_DIR}/${prog_file}"
+    [[ -f "$local_path" ]] && \
+        ARGS+=(--upgradeable-program "${GENESIS_PROGRAMS[$prog_file]}" "$BPF_LOADER" "$local_path" "$FAUCET_PUB")
+done
 
-# Create genesis and capture output
-GENESIS_OUTPUT=$(solana-genesis "${ARGS[@]}" 2>&1) || { log_error "Genesis failed"; exit 1; }
-
-# Extract genesis hash from output (format: "Genesis hash: XXXXX")
+# ── Create genesis ──────────────────────────────────────────────────────────
+GENESIS_OUTPUT=$(solana-genesis "${ARGS[@]}" 2>&1) || { log_error "Genesis failed"; echo "$GENESIS_OUTPUT"; exit 1; }
 GENESIS_HASH=$(echo "$GENESIS_OUTPUT" | grep -i "genesis hash" | grep -oE '[A-Za-z0-9]{32,}' | head -1 || echo "")
 
 log_success "Genesis created!"
-if [[ -n "$GENESIS_HASH" ]]; then
-    log_info "Hash: $GENESIS_HASH"
-else
-    log_warn "Could not extract genesis hash from output"
-    log_info "You can find it in the genesis output above"
-fi
+[[ -n "$GENESIS_HASH" ]] && log_info "Hash: $GENESIS_HASH" || log_warn "Could not extract genesis hash"
 log_info "Faucet: $FAUCET_PUB ($(echo "$GENESIS_LAMPORTS / 1000000000" | bc) SOL)"
 
-# Save faucet info (in same directory as keys for easy access)
-FAUCET_INFO_DIR=$(dirname "$FAUCET")
-cat > "${FAUCET_INFO_DIR}/faucet.txt" <<EOF
+# ── Save faucet info ────────────────────────────────────────────────────────
+cat > "${BASE_DIR}/keys/faucet.txt" <<EOF
 FAUCET_PUBKEY=$FAUCET_PUB
 FAUCET_KEY=$FAUCET_KEY
 GENESIS_HASH=$GENESIS_HASH
 BOOTSTRAP_IDENTITY=$IDENTITY_PUB
 EOF
-log_info "Faucet info saved to: faucet.txt"
+log_info "Faucet info → ${BASE_DIR}/keys/faucet.txt"
