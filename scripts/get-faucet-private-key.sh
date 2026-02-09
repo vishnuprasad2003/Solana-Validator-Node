@@ -21,14 +21,16 @@ log_info "Extracting from: $KEY_FILE"
 if command_exists python3; then
     KEY_FILE_PATH="$KEY_FILE" python3 -c '
 import json, sys, os
-    try:
-        import base58
-    except ImportError:
-    print("ERROR: pip install base58", file=sys.stderr); sys.exit(1)
+try:
+    import base58
+except ImportError:
+    print("ERROR: pip install base58", file=sys.stderr)
+    sys.exit(1)
 with open(os.environ["KEY_FILE_PATH"]) as f:
-    print(base58.b58encode(bytes(json.load(f))).decode())
+    data = json.load(f)
+    print(base58.b58encode(bytes(data)).decode())
 ' && exit 0
-    fi
+fi
 
 if command_exists node; then
     node -e "
